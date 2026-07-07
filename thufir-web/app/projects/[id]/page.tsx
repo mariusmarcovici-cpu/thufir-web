@@ -119,6 +119,7 @@ export default function ProjectDetailPage() {
 
         {s && (
           <>
+            {/* Summary */}
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))", gap: 10, marginBottom: 14 }}>
               <div className="card" style={{ padding: "14px 16px" }}>
                 <div className="muted" style={{ fontSize: 12, marginBottom: 4 }}>Overall mood</div>
@@ -138,6 +139,7 @@ export default function ProjectDetailPage() {
               </div>
             </div>
 
+            {/* Timeline */}
             {ana.timeline?.length > 1 && (
               <div className="card" style={{ marginBottom: 14 }}>
                 <div style={{ fontSize: 15, fontWeight: 500, marginBottom: 10 }}>Engagement over time</div>
@@ -155,6 +157,7 @@ export default function ProjectDetailPage() {
               </div>
             )}
 
+            {/* Leaderboard */}
             {ana.leaderboard?.length > 0 && (
               <div className="card" style={{ marginBottom: 14 }}>
                 <div style={{ fontSize: 15, fontWeight: 500, marginBottom: 2 }}>Who&apos;s winning attention</div>
@@ -176,6 +179,7 @@ export default function ProjectDetailPage() {
               </div>
             )}
 
+            {/* Topics */}
             {ana.topics?.length > 0 && (
               <div className="card" style={{ marginBottom: 14 }}>
                 <div style={{ fontSize: 15, fontWeight: 500, marginBottom: 10 }}>What the market is talking about</div>
@@ -190,6 +194,7 @@ export default function ProjectDetailPage() {
               </div>
             )}
 
+            {/* Top posts */}
             {ana.top_posts?.length > 0 && (
               <div className="card" style={{ marginBottom: 14 }}>
                 <div style={{ fontSize: 15, fontWeight: 500, marginBottom: 10 }}>Top posts by engagement</div>
@@ -209,6 +214,7 @@ export default function ProjectDetailPage() {
           </>
         )}
 
+        {/* Market scout */}
         <div className="card" style={{ marginBottom: 14 }}>
           <div className="spread" style={{ marginBottom: 4 }}>
             <span style={{ fontSize: 15, fontWeight: 500 }}>Market scout</span>
@@ -228,6 +234,7 @@ export default function ProjectDetailPage() {
           )}
         </div>
 
+        {/* Sources */}
         <div className="card">
           <div style={{ fontSize: 15, fontWeight: 500, marginBottom: 4 }}>Sources</div>
           <p className="muted" style={{ fontSize: 12, margin: "0 0 10px" }}>News/RSS feeds work anytime. Facebook collection needs Apify credit.</p>
