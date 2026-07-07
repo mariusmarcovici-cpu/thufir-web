@@ -43,10 +43,10 @@ export default function ProjectDetailPage() {
   const [msg, setMsg] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  const analyze = useCallback(async () => {
+  const analyze = useCallback(async (elena = false) => {
     setAnalyzing(true); setError(null);
     try {
-      const r = await call(`/projects/${id}/analyze`, "POST");
+      const r = await call(`/projects/${id}/analyze${elena ? "?elena=true" : ""}`, "POST");
       if (r.error) setError(r.error); else setAna(r);
     } catch (e: any) { setError(e.message || "Analysis failed."); }
     finally { setAnalyzing(false); }
@@ -108,7 +108,10 @@ export default function ProjectDetailPage() {
                 {(project.project.languages || []).map((l: string) => <span key={l} className="chip">{l}</span>)}
               </div>
             </div>
-            <button className="btn" disabled={analyzing} onClick={analyze}>{analyzing ? "Analysing…" : "Re-analyse"}</button>
+            <div className="row" style={{ gap: 8 }}>
+              <button className="btn" disabled={analyzing} onClick={() => analyze(false)}>{analyzing ? "Analysing…" : "Re-analyse"}</button>
+              <button className="btn btn-primary" disabled={analyzing} onClick={() => analyze(true)}>{analyzing ? "…" : "Deep tone (Elena)"}</button>
+            </div>
           </div>
         )}
 
@@ -124,6 +127,7 @@ export default function ProjectDetailPage() {
               <div className="card" style={{ padding: "14px 16px" }}>
                 <div className="muted" style={{ fontSize: 12, marginBottom: 4 }}>Overall mood</div>
                 <div style={{ fontSize: 22, fontWeight: 500, color: moodColor(s.overall_mood) }}>{s.overall_mood}</div>
+                <div className="muted" style={{ fontSize: 10, marginTop: 2 }}>{s.tone_engine === "elena-gemini" ? "Elena · Gemini" : "keyword tone"}</div>
               </div>
               <div className="card" style={{ padding: "14px 16px" }}>
                 <div className="muted" style={{ fontSize: 12, marginBottom: 4 }}>Posts analysed</div>
