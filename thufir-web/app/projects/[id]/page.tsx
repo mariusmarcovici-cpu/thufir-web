@@ -112,6 +112,8 @@ export default function ProjectDetailPage() {
   const [msg, setMsg] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [picked, setPicked] = useState<Set<string>>(new Set());
+  const [opsEvents, setOpsEvents] = useState<any[]>([]);
+  const [folSeries, setFolSeries] = useState<any>(null);
 
   const analyze = useCallback(async (elena = false) => {
     setAnalyzing(true); setError(null);
@@ -125,14 +127,16 @@ export default function ProjectDetailPage() {
   const loadMeta = useCallback(async () => {
     if (!id) return;
     try {
-      const [p, d, v] = await Promise.all([
+      const [p, d, v, o] = await Promise.all([
         call(`/projects/${id}`, "GET"),
         call(`/projects/${id}/discovered`, "GET").catch(() => ({ topics: [], domains: [], pages: [] })),
         call(`/projects/${id}/velocity/topics?window=30d`, "GET").catch(() => null),
+        call(`/projects/${id}/ops?limit=5`, "GET").catch(() => ({ events: [] })),
       ]);
       setProject(p);
       setDisc({ topics: d.topics || [], domains: d.domains || [], pages: d.pages || [] });
       setVelo(v);
+      setOpsEvents(o.events || []);
     } catch { setError("Couldn't load this project."); }
   }, [id]);
 
@@ -144,6 +148,12 @@ export default function ProjectDetailPage() {
     const dl = ana?.duel || [];
     if (dl.length >= 2 && !duelA) { setDuelA(dl[0].entity_id); setDuelB(dl[1].entity_id); }
   }, [ana, picked.size, duelA]);
+
+  useEffect(() => {
+    if (!duelA || !duelB) return;
+    call(`/projects/${id}/followers?ids=${encodeURIComponent(duelA)}&ids=${encodeURIComponent(duelB)}`, "GET")
+      .then((r) => setFolSeries(r.series || null)).catch(() => setFolSeries(null));
+  }, [id, duelA, duelB]);
 
   function togglePick(eid: string) {
     setPicked((cur) => { const n = new Set(cur); n.has(eid) ? n.delete(eid) : n.add(eid); return n; });
@@ -323,7 +333,31 @@ export default function ProjectDetailPage() {
 
                 <div className="card" style={{ marginBottom: 14 }}>
                   <div style={{ fontSize: 14, fontWeight: 500, marginBottom: 4 }}>Follower trend</div>
-                  <div className="muted" style={{ fontSize: 12 }}>Starts recording when scheduled daily collection goes live (Phase B) — the storage is ready; the first data point begins the line.</div>
+                  {(() => {
+                    const sa = folSeries?.[duelA] || [], sb = folSeries?.[duelB] || [];
+                    if (sa.length + sb.length === 0) return <div className="muted" style={{ fontSize: 12 }}>Recording begins with the autonomous daily cycle — each day adds a point; the trend appears after the first few days of live collection.</div>;
+                    const days = Array.from(new Set([...sa, ...sb].map((x: any) => x.ts.slice(0, 10)))).sort();
+                    const data = days.map((day) => ({
+                      day,
+                      [A.page]: sa.filter((x: any) => x.ts.startsWith(day)).slice(-1)[0]?.followers ?? null,
+                      [B.page]: sb.filter((x: any) => x.ts.startsWith(day)).slice(-1)[0]?.followers ?? null,
+                    }));
+                    return (
+                      <div style={{ width: "100%", height: 180 }}>
+                        <ResponsiveContainer>
+                          <LineChart data={data} margin={{ top: 4, right: 8, left: -8, bottom: 0 }}>
+                            <CartesianGrid strokeDasharray="3 3" stroke="var(--border-soft)" vertical={false} />
+                            <XAxis dataKey="day" tick={{ fontSize: 10, fill: "var(--muted)" }} tickFormatter={(d) => d.slice(5)} />
+                            <YAxis tick={{ fontSize: 10, fill: "var(--muted)" }} domain={["auto", "auto"]} />
+                            <Tooltip />
+                            <Legend wrapperStyle={{ fontSize: 11 }} />
+                            <Line type="monotone" dataKey={A.page} stroke={LINE_COLORS[0]} strokeWidth={2} dot connectNulls />
+                            <Line type="monotone" dataKey={B.page} stroke={LINE_COLORS[3]} strokeWidth={2} dot connectNulls />
+                          </LineChart>
+                        </ResponsiveContainer>
+                      </div>
+                    );
+                  })()}
                 </div>
               </>
             )}
@@ -546,7 +580,14 @@ export default function ProjectDetailPage() {
                 <span style={{ fontSize: 15, fontWeight: 500 }}>Market scout</span>
                 <button className="btn" disabled={scouting} onClick={scout}>{scouting ? "Scouting…" : "Scout the market"}</button>
               </div>
-              <div className="muted" style={{ fontSize: 12, marginBottom: disc.topics.length ? 12 : 0 }}>Maps topics and sources from your anchors. Becomes fully autonomous (daily, auto-adding) in Phase B.</div>
+              <div className="muted" style={{ fontSize: 12, marginBottom: 8 }}>Autonomous: runs daily, auto-adds discovered pages and hashtags to the research pool, budget-guarded. Manual run anytime with the button.</div>
+              {opsEvents.length > 0 && (
+                <div style={{ fontSize: 11, marginBottom: disc.topics.length ? 12 : 0, padding: "6px 10px", background: "var(--surface-1, #f7f7f5)", borderRadius: 6 }}>
+                  {opsEvents.slice(0, 3).map((e: any, i: number) => (
+                    <div key={i} className="muted">{e.ts.slice(5, 16).replace("T", " ")} · {e.kind}: {e.detail}</div>
+                  ))}
+                </div>
+              )}
               {disc.topics.length > 0 && (
                 <div style={{ marginBottom: 10 }}>
                   <div className="muted" style={{ fontSize: 12, marginBottom: 6 }}>Dominant topics</div>
