@@ -22,11 +22,15 @@ async function call(path: string, method: "GET" | "POST", body?: any) {
 
 const moodColor = (m: string) => m === "positive" ? "#1D9E75" : m === "negative" ? "#D85A30" : "#888780";
 const moodBg = (m: string) => m === "positive" ? "#E1F5EE" : m === "negative" ? "#FAECE7" : "#F1EFE8";
-
 const LINE_COLORS = ["#2a78d6", "#1baf7a", "#eda100", "#d4537e", "#7f77dd", "#d85a30"];
+const CAT_COLORS: any = { politics: "#2a78d6", economy: "#1baf7a", "crime/safety": "#d85a30", "culture/carnival": "#d4537e", "weather/disaster": "#eda100", sports: "#7f77dd", community: "#888780" };
 
 function Mood({ m }: { m: string }) {
   return <span style={{ fontSize: 11, fontWeight: 500, color: moodColor(m), background: moodBg(m), padding: "2px 8px", borderRadius: 10 }}>{m}</span>;
+}
+function Ext({ href, children }: { href: string; children: any }) {
+  if (!href) return <span>{children}</span>;
+  return <a href={href} target="_blank" rel="noreferrer" style={{ color: "var(--accent)", textDecoration: "none" }}>{children} ↗</a>;
 }
 
 export default function ProjectDetailPage() {
@@ -35,18 +39,22 @@ export default function ProjectDetailPage() {
   const router = useRouter();
   const id = params.id as string;
 
+  const [view, setView] = useState<"dash" | "duel">("dash");
   const [project, setProject] = useState<any>(null);
   const [disc, setDisc] = useState<any>({ topics: [], domains: [], pages: [] });
+  const [velo, setVelo] = useState<any>(null);
   const [ana, setAna] = useState<any>(null);
   const [analyzing, setAnalyzing] = useState(true);
   const [scouting, setScouting] = useState(false);
+  const [reproc, setReproc] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [lbWin, setLbWin] = useState<"day" | "week" | "month">("week");
+  const [duelA, setDuelA] = useState<string>("");
+  const [duelB, setDuelB] = useState<string>("");
   const [urls, setUrls] = useState("https://stluciatimes.com/feed/\n");
   const [msg, setMsg] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [picked, setPicked] = useState<Set<string>>(new Set());
-  const [velo, setVelo] = useState<any>(null);
-  const [reproc, setReproc] = useState(false);
 
   const analyze = useCallback(async (elena = false) => {
     setAnalyzing(true); setError(null);
@@ -76,10 +84,23 @@ export default function ProjectDetailPage() {
   useEffect(() => {
     const ps = ana?.page_series || [];
     if (ps.length && picked.size === 0) setPicked(new Set(ps.slice(0, 3).map((p: any) => p.entity_id)));
-  }, [ana, picked.size]);
+    const dl = ana?.duel || [];
+    if (dl.length >= 2 && !duelA) { setDuelA(dl[0].entity_id); setDuelB(dl[1].entity_id); }
+  }, [ana, picked.size, duelA]);
 
   function togglePick(eid: string) {
     setPicked((cur) => { const n = new Set(cur); n.has(eid) ? n.delete(eid) : n.add(eid); return n; });
+  }
+
+  async function rebuildIndex() {
+    setReproc(true); setError(null); setMsg(null);
+    try {
+      const r = await call(`/projects/${id}/reprocess`, "POST");
+      if (r.error) setError(`Reprocess: ${r.error}`);
+      else setMsg(`Semantic index rebuilt: ${r.posts_reprocessed} posts → ${r.clusters} topics, ${r.clusters_named ?? 0} named (${r.embedding_provider}).`);
+      await loadMeta();
+    } catch (e: any) { setError(e.message || "Reprocess failed."); }
+    finally { setReproc(false); }
   }
 
   async function scout() {
@@ -91,17 +112,6 @@ export default function ProjectDetailPage() {
       await loadMeta();
     } catch (e: any) { setError(e.message || "Scout failed."); }
     finally { setScouting(false); }
-  }
-
-  async function rebuildIndex() {
-    setReproc(true); setError(null); setMsg(null);
-    try {
-      const r = await call(`/projects/${id}/reprocess`, "POST");
-      if (r.error) setError(`Reprocess: ${r.error}`);
-      else setMsg(`Semantic index rebuilt: ${r.posts_reprocessed} posts -> ${r.clusters} topics (${r.embedding_provider} embeddings, ${r.vector_store} store).`);
-      await loadMeta();
-    } catch (e: any) { setError(e.message || "Reprocess failed."); }
-    finally { setReproc(false); }
   }
 
   async function collect() {
@@ -118,13 +128,27 @@ export default function ProjectDetailPage() {
   if (loading || !user) return <div className="center-screen"><div className="spinner" aria-label="Loading" /></div>;
 
   const s = ana?.summary;
-  const maxEng = Math.max(1, ...(ana?.leaderboard || []).map((e: any) => e.engagement || 0));
+  const pulse = ana?.pulse;
+  const board = (ana?.leaderboards?.[lbWin] ?? ana?.leaderboard ?? []) as any[];
+  const maxEng = Math.max(1, ...board.map((e: any) => e.engagement || 0));
+  const topClusters = (velo?.topics ?? []).filter((t: any) => !String(t.label || "").startsWith("(media")).slice(0, 8);
+  const maxClusterEng = Math.max(1, ...topClusters.map((t: any) => t.engagement || 0));
+  const A = (ana?.duel || []).find((d: any) => d.entity_id === duelA);
+  const B = (ana?.duel || []).find((d: any) => d.entity_id === duelB);
+
+  const pulseLabel = pulse ? `${pulse.intensity} day` + (velo?.topics?.[0]?.category ? ` · ${velo.topics[0].category}` : "") : null;
 
   return (
     <>
       <TopBar />
       <div className="page" style={{ maxWidth: 900 }}>
-        <button className="btn btn-quiet" style={{ marginBottom: 14 }} onClick={() => router.push("/projects")}>&larr; Projects</button>
+        <div className="spread" style={{ marginBottom: 14 }}>
+          <button className="btn btn-quiet" onClick={() => router.push("/projects")}>&larr; Projects</button>
+          <div className="row" style={{ gap: 6 }}>
+            <button className={view === "dash" ? "btn btn-primary" : "btn"} onClick={() => setView("dash")}>Dashboard</button>
+            <button className={view === "duel" ? "btn btn-primary" : "btn"} onClick={() => setView("duel")}>Head-to-head</button>
+          </div>
+        </div>
 
         {project && (
           <div className="spread" style={{ marginBottom: 12, alignItems: "flex-start" }}>
@@ -133,6 +157,7 @@ export default function ProjectDetailPage() {
               <div className="row" style={{ gap: 6, flexWrap: "wrap" }}>
                 <span className="chip">{project.project.region_label}</span>
                 {(project.project.languages || []).map((l: string) => <span key={l} className="chip">{l}</span>)}
+                {pulseLabel && <span className="chip" style={{ background: pulse.intensity === "intense" ? "#FAECE7" : pulse.intensity === "calm" ? "#E1F5EE" : undefined, fontWeight: 500 }}>Pulse: {pulseLabel}</span>}
               </div>
             </div>
             <div className="row" style={{ gap: 8 }}>
@@ -145,12 +170,112 @@ export default function ProjectDetailPage() {
 
         {error && <div className="alert alert-danger" style={{ marginBottom: 12 }}>{error}</div>}
         {msg && <div className="alert" style={{ background: "var(--success-bg)", color: "var(--success-text)", marginBottom: 12 }}>{msg}</div>}
-
         {analyzing && !ana && <div className="card" style={{ marginBottom: 14 }}><div className="muted" style={{ fontSize: 13 }}>Reading collected data and analysing…</div></div>}
 
-        {s && (
+        {/* ============ HEAD-TO-HEAD VIEW ============ */}
+        {view === "duel" && ana?.duel?.length >= 2 && (
           <>
-            {/* Summary */}
+            <div className="card" style={{ marginBottom: 14 }}>
+              <div style={{ fontSize: 15, fontWeight: 500, marginBottom: 8 }}>Head-to-head — all metrics, two pages in parallel</div>
+              <div className="row" style={{ gap: 10, flexWrap: "wrap" }}>
+                <select className="input" style={{ maxWidth: 320 }} value={duelA} onChange={(e) => setDuelA(e.target.value)}>
+                  {ana.duel.map((d: any) => <option key={d.entity_id} value={d.entity_id}>{d.page}</option>)}
+                </select>
+                <span className="muted" style={{ alignSelf: "center" }}>vs</span>
+                <select className="input" style={{ maxWidth: 320 }} value={duelB} onChange={(e) => setDuelB(e.target.value)}>
+                  {ana.duel.map((d: any) => <option key={d.entity_id} value={d.entity_id}>{d.page}</option>)}
+                </select>
+              </div>
+            </div>
+
+            {A && B && (
+              <>
+                <div className="card" style={{ marginBottom: 14 }}>
+                  <table style={{ width: "100%", fontSize: 13, borderCollapse: "collapse" }}>
+                    <thead>
+                      <tr style={{ borderBottom: "1px solid var(--border-soft)" }}>
+                        <th style={{ textAlign: "left", padding: "6px 4px" }} className="muted">Metric</th>
+                        <th style={{ textAlign: "right", padding: "6px 4px", color: LINE_COLORS[0] }}><Ext href={A.page_url}>{A.page}</Ext></th>
+                        <th style={{ textAlign: "right", padding: "6px 4px", color: LINE_COLORS[3] }}><Ext href={B.page_url}>{B.page}</Ext></th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {[
+                        ["Posts (sampled)", A.posts, B.posts],
+                        ["Reactions", A.likes, B.likes],
+                        ["Shares", A.shares, B.shares],
+                        ["Video views", A.views, B.views],
+                        ["Total engagement", A.engagement, B.engagement],
+                        ["Engagement / post", A.eng_per_post, B.eng_per_post],
+                      ].map(([label, a, b]: any) => (
+                        <tr key={label} style={{ borderBottom: "0.5px solid var(--border-soft)" }}>
+                          <td style={{ padding: "6px 4px" }}>{label}</td>
+                          <td style={{ textAlign: "right", padding: "6px 4px", fontWeight: a >= b ? 600 : 400 }}>{Number(a).toLocaleString()}</td>
+                          <td style={{ textAlign: "right", padding: "6px 4px", fontWeight: b >= a ? 600 : 400 }}>{Number(b).toLocaleString()}</td>
+                        </tr>
+                      ))}
+                      <tr>
+                        <td style={{ padding: "6px 4px" }}>Tone</td>
+                        <td style={{ textAlign: "right", padding: "6px 4px" }}><Mood m={A.mood} /></td>
+                        <td style={{ textAlign: "right", padding: "6px 4px" }}><Mood m={B.mood} /></td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+
+                <div className="card" style={{ marginBottom: 14 }}>
+                  <div style={{ fontSize: 14, fontWeight: 500, marginBottom: 8 }}>Engagement by day</div>
+                  <div style={{ width: "100%", height: 200 }}>
+                    <ResponsiveContainer>
+                      <LineChart data={(() => {
+                        const days = Array.from(new Set([...A.series, ...B.series].map((x: any) => x.day))).sort();
+                        return days.map((day) => ({
+                          day,
+                          [A.page]: A.series.find((x: any) => x.day === day)?.eng ?? 0,
+                          [B.page]: B.series.find((x: any) => x.day === day)?.eng ?? 0,
+                        }));
+                      })()} margin={{ top: 4, right: 8, left: -14, bottom: 0 }}>
+                        <CartesianGrid strokeDasharray="3 3" stroke="var(--border-soft)" vertical={false} />
+                        <XAxis dataKey="day" tick={{ fontSize: 10, fill: "var(--muted)" }} tickFormatter={(d) => d.slice(5)} />
+                        <YAxis tick={{ fontSize: 10, fill: "var(--muted)" }} allowDecimals={false} />
+                        <Tooltip />
+                        <Legend wrapperStyle={{ fontSize: 11 }} />
+                        <Line type="monotone" dataKey={A.page} stroke={LINE_COLORS[0]} strokeWidth={2} dot={false} />
+                        <Line type="monotone" dataKey={B.page} stroke={LINE_COLORS[3]} strokeWidth={2} dot={false} />
+                      </LineChart>
+                    </ResponsiveContainer>
+                  </div>
+                </div>
+
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 14 }}>
+                  {[A, B].map((P: any, i: number) => (
+                    <div key={P.entity_id} className="card">
+                      <div className="muted" style={{ fontSize: 12, marginBottom: 4 }}>Best post — <span style={{ color: LINE_COLORS[i === 0 ? 0 : 3] }}>{P.page}</span></div>
+                      {P.best_post ? (
+                        <>
+                          <div style={{ fontSize: 13, marginBottom: 6 }}>{P.best_post.text || "(no text)"}</div>
+                          <div className="spread" style={{ fontSize: 12 }}>
+                            <span className="muted">{P.best_post.engagement.toLocaleString()} eng</span>
+                            <Ext href={P.best_post.url}>open post</Ext>
+                          </div>
+                        </>
+                      ) : <div className="muted" style={{ fontSize: 12 }}>—</div>}
+                    </div>
+                  ))}
+                </div>
+
+                <div className="card" style={{ marginBottom: 14 }}>
+                  <div style={{ fontSize: 14, fontWeight: 500, marginBottom: 4 }}>Follower trend</div>
+                  <div className="muted" style={{ fontSize: 12 }}>Starts recording when scheduled daily collection goes live (Phase B) — the storage is ready; the first data point begins the line.</div>
+                </div>
+              </>
+            )}
+          </>
+        )}
+
+        {/* ============ DASHBOARD VIEW ============ */}
+        {view === "dash" && s && (
+          <>
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))", gap: 10, marginBottom: 14 }}>
               <div className="card" style={{ padding: "14px 16px" }}>
                 <div className="muted" style={{ fontSize: 12, marginBottom: 4 }}>Overall mood</div>
@@ -171,48 +296,69 @@ export default function ProjectDetailPage() {
               </div>
             </div>
 
-            {/* Timeline */}
-            {ana.timeline?.length > 1 && (
+            {/* Engagement clusters (replaces engagement-over-time) */}
+            {topClusters.length > 0 && (
               <div className="card" style={{ marginBottom: 14 }}>
-                <div style={{ fontSize: 15, fontWeight: 500, marginBottom: 10 }}>Engagement over time</div>
-                <div style={{ width: "100%", height: 180 }}>
-                  <ResponsiveContainer>
-                    <AreaChart data={ana.timeline} margin={{ top: 4, right: 8, left: -14, bottom: 0 }}>
-                      <CartesianGrid strokeDasharray="3 3" stroke="var(--border-soft)" vertical={false} />
-                      <XAxis dataKey="day" tick={{ fontSize: 10, fill: "var(--muted)" }} tickFormatter={(d) => d.slice(5)} />
-                      <YAxis tick={{ fontSize: 10, fill: "var(--muted)" }} allowDecimals={false} />
-                      <Tooltip />
-                      <Area type="monotone" dataKey="eng" stroke="var(--accent)" fill="var(--accent)" fillOpacity={0.12} name="engagement" />
-                    </AreaChart>
-                  </ResponsiveContainer>
+                <div className="spread" style={{ marginBottom: 2 }}>
+                  <span style={{ fontSize: 15, fontWeight: 500 }}>Engagement clusters</span>
+                  {velo?.network_integrity != null && <span className="chip">Network integrity {Math.round(velo.network_integrity * 100)}%</span>}
                 </div>
-              </div>
-            )}
-
-            {/* Leaderboard */}
-            {ana.leaderboard?.length > 0 && (
-              <div className="card" style={{ marginBottom: 14 }}>
-                <div style={{ fontSize: 15, fontWeight: 500, marginBottom: 2 }}>Who&apos;s winning attention</div>
-                <div className="muted" style={{ fontSize: 12, marginBottom: 12 }}>Pages ranked by engagement (reactions + shares) on their recent posts, with tone.</div>
-                <div className="stack" style={{ gap: 10 }}>
-                  {ana.leaderboard.map((e: any, i: number) => (
-                    <div key={e.page}>
-                      <div className="spread" style={{ fontSize: 13, marginBottom: 3 }}>
-                        <span style={{ fontWeight: 500 }}>{i + 1}. {e.page} &nbsp;<Mood m={e.mood} /></span>
-                        <span className="muted">{e.engagement.toLocaleString()} eng · {(ana.summary?.total_engagement ? (e.engagement / ana.summary.total_engagement * 100) : 0).toFixed(1)}% SoV</span>
+                <div className="muted" style={{ fontSize: 12, marginBottom: 10 }}>The topics pulling the most engagement right now.</div>
+                <div className="stack" style={{ gap: 8 }}>
+                  {topClusters.map((t: any) => (
+                    <div key={t.topic_cluster_id}>
+                      <div className="spread" style={{ fontSize: 13, marginBottom: 2 }}>
+                        <span style={{ fontWeight: 500 }}>
+                          {t.label}
+                          {t.category && <span style={{ marginLeft: 6, fontSize: 10, color: CAT_COLORS[t.category] || "var(--muted)", border: `1px solid ${CAT_COLORS[t.category] || "var(--border-soft)"}`, padding: "1px 6px", borderRadius: 8 }}>{t.category}</span>}
+                        </span>
+                        <span className="muted">{(t.engagement || 0).toLocaleString()} eng</span>
                       </div>
-                      <div style={{ height: 8, background: "var(--border-soft)", borderRadius: 4, overflow: "hidden" }}>
-                        <div style={{ width: `${Math.round((e.engagement / maxEng) * 100)}%`, height: "100%", background: "var(--accent)" }} />
+                      <div style={{ height: 7, background: "var(--border-soft)", borderRadius: 4, overflow: "hidden" }}>
+                        <div style={{ width: `${Math.round(((t.engagement || 0) / maxClusterEng) * 100)}%`, height: "100%", background: CAT_COLORS[t.category] || "var(--accent)" }} />
                       </div>
-                      <div className="muted" style={{ fontSize: 11, marginTop: 3 }}>{e.likes.toLocaleString()} reactions · {e.shares.toLocaleString()} shares · {e.views.toLocaleString()} views</div>
+                      <div className="muted" style={{ fontSize: 11, marginTop: 2 }}>{t.posts} posts · {t.pages_talking} pages talking</div>
                     </div>
                   ))}
                 </div>
               </div>
             )}
 
+            {/* Leaderboard with window toggle */}
+            {board.length > 0 && (
+              <div className="card" style={{ marginBottom: 14 }}>
+                <div className="spread" style={{ marginBottom: 2 }}>
+                  <span style={{ fontSize: 15, fontWeight: 500 }}>Who&apos;s winning attention</span>
+                  <div className="row" style={{ gap: 4 }}>
+                    {(["day", "week", "month"] as const).map((w) => (
+                      <button key={w} className={lbWin === w ? "btn btn-primary" : "btn btn-quiet"} style={{ fontSize: 11, padding: "3px 10px" }} onClick={() => setLbWin(w)}>{w === "day" ? "Today" : w === "week" ? "This week" : "This month"}</button>
+                    ))}
+                  </div>
+                </div>
+                <div className="muted" style={{ fontSize: 12, marginBottom: 12 }}>Top 10 pages by engagement in the window, with each page&apos;s best post.</div>
+                <div className="stack" style={{ gap: 12 }}>
+                  {board.map((e: any, i: number) => (
+                    <div key={e.entity_id || e.page}>
+                      <div className="spread" style={{ fontSize: 13, marginBottom: 3 }}>
+                        <span style={{ fontWeight: 500 }}>{i + 1}. <Ext href={e.page_url}>{e.page || e.display_name}</Ext> &nbsp;<Mood m={e.mood} /></span>
+                        <span className="muted">{e.engagement.toLocaleString()} eng · {(e.share_of_voice_pct ?? 0).toFixed(1)}% SoV</span>
+                      </div>
+                      <div style={{ height: 8, background: "var(--border-soft)", borderRadius: 4, overflow: "hidden" }}>
+                        <div style={{ width: `${Math.round((e.engagement / maxEng) * 100)}%`, height: "100%", background: "var(--accent)" }} />
+                      </div>
+                      <div className="muted" style={{ fontSize: 11, marginTop: 3 }}>{e.likes.toLocaleString()} reactions · {e.shares.toLocaleString()} shares · {e.views.toLocaleString()} views</div>
+                      {e.best_post && (
+                        <div style={{ fontSize: 12, marginTop: 4, paddingLeft: 10, borderLeft: "2px solid var(--border-soft)" }}>
+                          <span className="muted">best: </span>{e.best_post.text || "(no text)"} <span className="muted">· {e.best_post.engagement.toLocaleString()} eng · </span><Ext href={e.best_post.url}>open</Ext>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
 
-            {/* Compare pages */}
+            {/* Compare pages (multi) */}
             {ana.page_series?.length > 1 && (() => {
               const chosen = ana.page_series.filter((p: any) => picked.has(p.entity_id));
               const days = Array.from(new Set(chosen.flatMap((p: any) => p.series.map((x: any) => x.day)))).sort() as string[];
@@ -224,7 +370,7 @@ export default function ProjectDetailPage() {
               return (
                 <div className="card" style={{ marginBottom: 14 }}>
                   <div style={{ fontSize: 15, fontWeight: 500, marginBottom: 2 }}>Compare pages</div>
-                  <div className="muted" style={{ fontSize: 12, marginBottom: 10 }}>Pick pages to put head-to-head on engagement over time.</div>
+                  <div className="muted" style={{ fontSize: 12, marginBottom: 10 }}>Pick pages to put head-to-head on engagement over time. For a full two-page duel, use the Head-to-head tab.</div>
                   <div className="row" style={{ gap: 6, flexWrap: "wrap", marginBottom: 12 }}>
                     {ana.page_series.slice(0, 12).map((p: any) => {
                       const on = picked.has(p.entity_id);
@@ -256,47 +402,30 @@ export default function ProjectDetailPage() {
                       </ResponsiveContainer>
                     </div>
                   )}
-                  {chosen.length > 0 && (
-                    <div className="stack" style={{ gap: 7, marginTop: 12 }}>
-                      {chosen.map((p: any, i: number) => (
-                        <div key={p.entity_id} className="spread" style={{ fontSize: 13, borderBottom: "0.5px solid var(--border-soft)", paddingBottom: 5 }}>
-                          <span style={{ fontWeight: 500, color: LINE_COLORS[i % LINE_COLORS.length] }}>{p.page} &nbsp;<Mood m={p.mood} /></span>
-                          <span className="muted">{p.engagement.toLocaleString()} eng · {(ana.summary?.total_engagement ? (p.engagement / ana.summary.total_engagement * 100) : 0).toFixed(1)}% share of voice</span>
-                        </div>
-                      ))}
-                    </div>
-                  )}
                 </div>
               );
             })()}
 
-            {/* Semantic topics (velocity engine) */}
+            {/* What the market is talking about (named topics + stats) */}
             {velo?.topics?.length > 0 ? (
               <div className="card" style={{ marginBottom: 14 }}>
-                <div className="spread" style={{ marginBottom: 2 }}>
-                  <span style={{ fontSize: 15, fontWeight: 500 }}>What the market is talking about</span>
-                  <span className="chip" title="authentic vs raw volume across the window">
-                    Network integrity {Math.round((velo.network_integrity || 0) * 100)}%
-                  </span>
-                </div>
-                <div className="muted" style={{ fontSize: 12, marginBottom: 10 }}>Semantic clusters from the velocity engine ({velo.window}, {velo.source}). Arrows show change vs the previous window.</div>
+                <div style={{ fontSize: 15, fontWeight: 500, marginBottom: 2 }}>What the market is talking about</div>
+                <div className="muted" style={{ fontSize: 12, marginBottom: 10 }}>Semantic topics with real names and intensity data.</div>
                 <div className="stack" style={{ gap: 8 }}>
                   {velo.topics.slice(0, 12).map((t: any) => (
                     <div key={t.topic_cluster_id} style={{ borderBottom: "0.5px solid var(--border-soft)", paddingBottom: 6 }}>
                       <div className="spread" style={{ fontSize: 13 }}>
-                        <span style={{ fontWeight: 500 }}>{t.label}
+                        <span style={{ fontWeight: 500 }}>
+                          {t.label}
+                          {t.category && <span style={{ marginLeft: 6, fontSize: 10, color: CAT_COLORS[t.category] || "var(--muted)" }}>· {t.category}</span>}
                           {t.velocity_delta_pct != null && (
                             <span style={{ marginLeft: 6, fontSize: 11, color: t.velocity_delta_pct >= 0 ? "#1D9E75" : "#D85A30" }}>
                               {t.velocity_delta_pct >= 0 ? "▲" : "▼"} {Math.abs(t.velocity_delta_pct)}%
                             </span>
                           )}
                         </span>
-                        <span className="muted">{t.raw_volume} raw · {Math.round(t.authenticity_ratio * 100)}% authentic</span>
+                        <span className="muted">{t.posts} posts · {t.pages_talking} pages · {(t.engagement || 0).toLocaleString()} eng</span>
                       </div>
-                      <div style={{ height: 5, background: "var(--border-soft)", borderRadius: 3, overflow: "hidden", marginTop: 4 }}>
-                        <div style={{ width: `${Math.round(t.authenticity_ratio * 100)}%`, height: "100%", background: "#1D9E75" }} />
-                      </div>
-                      {t.top_terms && <div className="muted" style={{ fontSize: 11, marginTop: 3 }}>{t.top_terms}</div>}
                     </div>
                   ))}
                 </div>
@@ -304,7 +433,7 @@ export default function ProjectDetailPage() {
             ) : ana.topics?.length > 0 && (
               <div className="card" style={{ marginBottom: 14 }}>
                 <div style={{ fontSize: 15, fontWeight: 500, marginBottom: 2 }}>What the market is talking about</div>
-                <div className="muted" style={{ fontSize: 12, marginBottom: 10 }}>Hashtag grouping (fallback). Click "Rebuild semantic index" above to switch to semantic clusters.</div>
+                <div className="muted" style={{ fontSize: 12, marginBottom: 10 }}>Hashtag grouping (fallback). Click &quot;Rebuild semantic index&quot; above.</div>
                 <div className="stack" style={{ gap: 8 }}>
                   {ana.topics.map((t: any) => (
                     <div key={t.topic} className="spread" style={{ fontSize: 13, borderBottom: "0.5px solid var(--border-soft)", paddingBottom: 6 }}>
@@ -325,44 +454,48 @@ export default function ProjectDetailPage() {
                     <div key={i} style={{ borderBottom: "0.5px solid var(--border-soft)", paddingBottom: 10 }}>
                       <div className="spread" style={{ fontSize: 12, marginBottom: 4 }}>
                         <span style={{ fontWeight: 500 }}>{p.page} &nbsp;<Mood m={p.mood} /></span>
-                        <span className="muted">{p.engagement.toLocaleString()} eng · {p.day.slice(5)}</span>
+                        <span className="muted">{p.day.slice(5)}</span>
                       </div>
-                      <div style={{ fontSize: 13, color: "var(--text-2, #444)" }}>{p.text || <span className="muted">(no text)</span>}</div>
+                      <div style={{ fontSize: 13, color: "var(--text-2, #444)", marginBottom: 4 }}>{p.text || <span className="muted">(no text)</span>}</div>
+                      <div className="spread" style={{ fontSize: 11 }}>
+                        <span className="muted">{p.likes.toLocaleString()} reactions · {p.shares.toLocaleString()} shares · {p.views.toLocaleString()} views · {p.engagement.toLocaleString()} total</span>
+                        <Ext href={p.url}>open post</Ext>
+                      </div>
                     </div>
                   ))}
                 </div>
               </div>
             )}
+
+            {/* Market scout */}
+            <div className="card" style={{ marginBottom: 14 }}>
+              <div className="spread" style={{ marginBottom: 4 }}>
+                <span style={{ fontSize: 15, fontWeight: 500 }}>Market scout</span>
+                <button className="btn" disabled={scouting} onClick={scout}>{scouting ? "Scouting…" : "Scout the market"}</button>
+              </div>
+              <div className="muted" style={{ fontSize: 12, marginBottom: disc.topics.length ? 12 : 0 }}>Maps topics and sources from your anchors. Becomes fully autonomous (daily, auto-adding) in Phase B.</div>
+              {disc.topics.length > 0 && (
+                <div style={{ marginBottom: 10 }}>
+                  <div className="muted" style={{ fontSize: 12, marginBottom: 6 }}>Dominant topics</div>
+                  <div className="row" style={{ gap: 6, flexWrap: "wrap" }}>{disc.topics.slice(0, 18).map((t: any) => <span key={t.ref} className="chip">#{t.ref} <span className="muted">· {t.co_count}</span></span>)}</div>
+                </div>
+              )}
+              {disc.domains.length > 0 && (
+                <div><div className="muted" style={{ fontSize: 12, marginBottom: 6 }}>Shared sources</div>
+                  <div className="row" style={{ gap: 6, flexWrap: "wrap" }}>{disc.domains.slice(0, 12).map((d: any) => <span key={d.ref} className="chip">{d.ref} <span className="muted">· {d.co_count}</span></span>)}</div>
+                </div>
+              )}
+            </div>
+
+            {/* Sources */}
+            <div className="card">
+              <div style={{ fontSize: 15, fontWeight: 500, marginBottom: 4 }}>Sources</div>
+              <p className="muted" style={{ fontSize: 12, margin: "0 0 10px" }}>News/RSS feeds work anytime. Facebook collection needs Apify credit.</p>
+              <textarea className="input" style={{ minHeight: 90, fontFamily: "monospace", fontSize: 12, resize: "vertical" }} value={urls} onChange={(e) => setUrls(e.target.value)} />
+              <button className="btn btn-primary" style={{ marginTop: 10 }} disabled={busy} onClick={collect}>{busy ? "Collecting…" : "Add sources & collect"}</button>
+            </div>
           </>
         )}
-
-        {/* Market scout */}
-        <div className="card" style={{ marginBottom: 14 }}>
-          <div className="spread" style={{ marginBottom: 4 }}>
-            <span style={{ fontSize: 15, fontWeight: 500 }}>Market scout</span>
-            <button className="btn" disabled={scouting} onClick={scout}>{scouting ? "Scouting…" : "Scout the market"}</button>
-          </div>
-          <div className="muted" style={{ fontSize: 12, marginBottom: disc.topics.length || disc.pages.length ? 12 : 0 }}>Maps topics and sources from your anchors. Finding brand-new pages needs Apify credit.</div>
-          {disc.topics.length > 0 && (
-            <div style={{ marginBottom: 10 }}>
-              <div className="muted" style={{ fontSize: 12, marginBottom: 6 }}>Dominant topics</div>
-              <div className="row" style={{ gap: 6, flexWrap: "wrap" }}>{disc.topics.slice(0, 18).map((t: any) => <span key={t.ref} className="chip">#{t.ref} <span className="muted">· {t.co_count}</span></span>)}</div>
-            </div>
-          )}
-          {disc.domains.length > 0 && (
-            <div><div className="muted" style={{ fontSize: 12, marginBottom: 6 }}>Shared sources</div>
-              <div className="row" style={{ gap: 6, flexWrap: "wrap" }}>{disc.domains.slice(0, 12).map((d: any) => <span key={d.ref} className="chip">{d.ref} <span className="muted">· {d.co_count}</span></span>)}</div>
-            </div>
-          )}
-        </div>
-
-        {/* Sources */}
-        <div className="card">
-          <div style={{ fontSize: 15, fontWeight: 500, marginBottom: 4 }}>Sources</div>
-          <p className="muted" style={{ fontSize: 12, margin: "0 0 10px" }}>News/RSS feeds work anytime. Facebook collection needs Apify credit.</p>
-          <textarea className="input" style={{ minHeight: 90, fontFamily: "monospace", fontSize: 12, resize: "vertical" }} value={urls} onChange={(e) => setUrls(e.target.value)} />
-          <button className="btn btn-primary" style={{ marginTop: 10 }} disabled={busy} onClick={collect}>{busy ? "Collecting…" : "Add sources & collect"}</button>
-        </div>
       </div>
     </>
   );
