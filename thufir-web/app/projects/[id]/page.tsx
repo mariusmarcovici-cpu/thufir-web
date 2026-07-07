@@ -45,6 +45,8 @@ export default function ProjectDetailPage() {
   const [msg, setMsg] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [picked, setPicked] = useState<Set<string>>(new Set());
+  const [velo, setVelo] = useState<any>(null);
+  const [reproc, setReproc] = useState(false);
 
   const analyze = useCallback(async (elena = false) => {
     setAnalyzing(true); setError(null);
@@ -58,12 +60,14 @@ export default function ProjectDetailPage() {
   const loadMeta = useCallback(async () => {
     if (!id) return;
     try {
-      const [p, d] = await Promise.all([
+      const [p, d, v] = await Promise.all([
         call(`/projects/${id}`, "GET"),
         call(`/projects/${id}/discovered`, "GET").catch(() => ({ topics: [], domains: [], pages: [] })),
+        call(`/projects/${id}/velocity/topics?window=30d`, "GET").catch(() => null),
       ]);
       setProject(p);
       setDisc({ topics: d.topics || [], domains: d.domains || [], pages: d.pages || [] });
+      setVelo(v);
     } catch { setError("Couldn't load this project."); }
   }, [id]);
 
@@ -87,6 +91,17 @@ export default function ProjectDetailPage() {
       await loadMeta();
     } catch (e: any) { setError(e.message || "Scout failed."); }
     finally { setScouting(false); }
+  }
+
+  async function rebuildIndex() {
+    setReproc(true); setError(null); setMsg(null);
+    try {
+      const r = await call(`/projects/${id}/reprocess`, "POST");
+      if (r.error) setError(`Reprocess: ${r.error}`);
+      else setMsg(`Semantic index rebuilt: ${r.posts_reprocessed} posts -> ${r.clusters} topics (${r.embedding_provider} embeddings, ${r.vector_store} store).`);
+      await loadMeta();
+    } catch (e: any) { setError(e.message || "Reprocess failed."); }
+    finally { setReproc(false); }
   }
 
   async function collect() {
@@ -123,6 +138,7 @@ export default function ProjectDetailPage() {
             <div className="row" style={{ gap: 8 }}>
               <button className="btn" disabled={analyzing} onClick={() => analyze(false)}>{analyzing ? "Analysing…" : "Re-analyse"}</button>
               <button className="btn btn-primary" disabled={analyzing} onClick={() => analyze(true)}>{analyzing ? "…" : "Deep tone (Elena)"}</button>
+              <button className="btn" disabled={reproc} onClick={rebuildIndex}>{reproc ? "Rebuilding…" : "Rebuild semantic index"}</button>
             </div>
           </div>
         )}
@@ -183,7 +199,7 @@ export default function ProjectDetailPage() {
                     <div key={e.page}>
                       <div className="spread" style={{ fontSize: 13, marginBottom: 3 }}>
                         <span style={{ fontWeight: 500 }}>{i + 1}. {e.page} &nbsp;<Mood m={e.mood} /></span>
-                        <span className="muted">{e.engagement.toLocaleString()} · {e.posts} posts</span>
+                        <span className="muted">{e.engagement.toLocaleString()} eng · {(ana.summary?.total_engagement ? (e.engagement / ana.summary.total_engagement * 100) : 0).toFixed(1)}% SoV</span>
                       </div>
                       <div style={{ height: 8, background: "var(--border-soft)", borderRadius: 4, overflow: "hidden" }}>
                         <div style={{ width: `${Math.round((e.engagement / maxEng) * 100)}%`, height: "100%", background: "var(--accent)" }} />
@@ -245,7 +261,7 @@ export default function ProjectDetailPage() {
                       {chosen.map((p: any, i: number) => (
                         <div key={p.entity_id} className="spread" style={{ fontSize: 13, borderBottom: "0.5px solid var(--border-soft)", paddingBottom: 5 }}>
                           <span style={{ fontWeight: 500, color: LINE_COLORS[i % LINE_COLORS.length] }}>{p.page} &nbsp;<Mood m={p.mood} /></span>
-                          <span className="muted">{p.engagement.toLocaleString()} eng · {p.posts} posts</span>
+                          <span className="muted">{p.engagement.toLocaleString()} eng · {(ana.summary?.total_engagement ? (p.engagement / ana.summary.total_engagement * 100) : 0).toFixed(1)}% share of voice</span>
                         </div>
                       ))}
                     </div>
@@ -254,15 +270,46 @@ export default function ProjectDetailPage() {
               );
             })()}
 
-            {/* Topics */}
-            {ana.topics?.length > 0 && (
+            {/* Semantic topics (velocity engine) */}
+            {velo?.topics?.length > 0 ? (
               <div className="card" style={{ marginBottom: 14 }}>
-                <div style={{ fontSize: 15, fontWeight: 500, marginBottom: 10 }}>What the market is talking about</div>
+                <div className="spread" style={{ marginBottom: 2 }}>
+                  <span style={{ fontSize: 15, fontWeight: 500 }}>What the market is talking about</span>
+                  <span className="chip" title="authentic vs raw volume across the window">
+                    Network integrity {Math.round((velo.network_integrity || 0) * 100)}%
+                  </span>
+                </div>
+                <div className="muted" style={{ fontSize: 12, marginBottom: 10 }}>Semantic clusters from the velocity engine ({velo.window}, {velo.source}). Arrows show change vs the previous window.</div>
+                <div className="stack" style={{ gap: 8 }}>
+                  {velo.topics.slice(0, 12).map((t: any) => (
+                    <div key={t.topic_cluster_id} style={{ borderBottom: "0.5px solid var(--border-soft)", paddingBottom: 6 }}>
+                      <div className="spread" style={{ fontSize: 13 }}>
+                        <span style={{ fontWeight: 500 }}>{t.label}
+                          {t.velocity_delta_pct != null && (
+                            <span style={{ marginLeft: 6, fontSize: 11, color: t.velocity_delta_pct >= 0 ? "#1D9E75" : "#D85A30" }}>
+                              {t.velocity_delta_pct >= 0 ? "▲" : "▼"} {Math.abs(t.velocity_delta_pct)}%
+                            </span>
+                          )}
+                        </span>
+                        <span className="muted">{t.raw_volume} raw · {Math.round(t.authenticity_ratio * 100)}% authentic</span>
+                      </div>
+                      <div style={{ height: 5, background: "var(--border-soft)", borderRadius: 3, overflow: "hidden", marginTop: 4 }}>
+                        <div style={{ width: `${Math.round(t.authenticity_ratio * 100)}%`, height: "100%", background: "#1D9E75" }} />
+                      </div>
+                      {t.top_terms && <div className="muted" style={{ fontSize: 11, marginTop: 3 }}>{t.top_terms}</div>}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ) : ana.topics?.length > 0 && (
+              <div className="card" style={{ marginBottom: 14 }}>
+                <div style={{ fontSize: 15, fontWeight: 500, marginBottom: 2 }}>What the market is talking about</div>
+                <div className="muted" style={{ fontSize: 12, marginBottom: 10 }}>Hashtag grouping (fallback). Click "Rebuild semantic index" above to switch to semantic clusters.</div>
                 <div className="stack" style={{ gap: 8 }}>
                   {ana.topics.map((t: any) => (
                     <div key={t.topic} className="spread" style={{ fontSize: 13, borderBottom: "0.5px solid var(--border-soft)", paddingBottom: 6 }}>
                       <span>#{t.topic} &nbsp;<Mood m={t.mood} /></span>
-                      <span className="muted">{t.posts} posts · {t.engagement.toLocaleString()} eng</span>
+                      <span className="muted">{t.engagement.toLocaleString()} eng</span>
                     </div>
                   ))}
                 </div>
