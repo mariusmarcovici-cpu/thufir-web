@@ -25,6 +25,63 @@ const moodBg = (m: string) => m === "positive" ? "#E1F5EE" : m === "negative" ? 
 const LINE_COLORS = ["#2a78d6", "#1baf7a", "#eda100", "#d4537e", "#7f77dd", "#d85a30"];
 const CAT_COLORS: any = { politics: "#2a78d6", economy: "#1baf7a", "crime/safety": "#d85a30", "culture/carnival": "#d4537e", "weather/disaster": "#eda100", sports: "#7f77dd", community: "#888780" };
 
+
+const BUBBLE_FILL: any = { positive: "#7A9A3C", negative: "#E8952F", neutral: "#D8D4C0" };
+const BUBBLE_TEXT: any = { positive: "#1d2a08", negative: "#4a2c00", neutral: "#555248" };
+
+function packBubbles(items: { r: number }[], W: number, H: number) {
+  const placed: { x: number; y: number; r: number }[] = [];
+  const cx = W / 2, cy = H / 2;
+  for (const it of items) {
+    let done = false;
+    for (let ring = 0; ring < 220 && !done; ring++) {
+      const rad = ring * 6;
+      const steps = Math.max(1, Math.floor((2 * Math.PI * rad) / 14));
+      for (let k = 0; k < steps; k++) {
+        const a = (k / steps) * 2 * Math.PI + ring * 0.5;
+        const x = cx + rad * Math.cos(a), y = cy + rad * Math.sin(a) * 0.85;
+        if (x - it.r < 4 || x + it.r > W - 4 || y - it.r < 4 || y + it.r > H - 4) continue;
+        if (placed.every((p) => Math.hypot(p.x - x, p.y - y) >= p.r + it.r + 3)) {
+          placed.push({ x, y, r: it.r }); done = true; break;
+        }
+      }
+    }
+    if (!done) placed.push({ x: cx, y: cy, r: 0 });
+  }
+  return placed;
+}
+
+function WordBubbles({ topics }: { topics: any[] }) {
+  const W = 860, H = 520;
+  const items = topics.slice(0, 24).map((t: any) => ({
+    word: String(t.label || "").split(/[\/·]| - /)[0].trim().split(" ").slice(0, 2).join(" ") || "topic",
+    full: t.label, n: t.posts || 0, eng: t.engagement || 0,
+    mood: t.mood || "neutral", category: t.category,
+  }));
+  const maxE = Math.max(1, ...items.map((i) => i.eng));
+  const sized = items.map((i) => ({ ...i, r: 24 + 52 * Math.sqrt(i.eng / maxE) }))
+    .sort((a, b) => b.r - a.r);
+  const pos = packBubbles(sized, W, H);
+  return (
+    <svg viewBox={`0 0 ${W} ${H}`} style={{ width: "100%", height: "auto", display: "block" }}>
+      {sized.map((b, i) => pos[i].r > 0 && (
+        <g key={i}>
+          <title>{b.full} — {b.n} posts · {b.eng.toLocaleString()} engagement · {b.mood}</title>
+          <circle cx={pos[i].x} cy={pos[i].y} r={b.r} fill={BUBBLE_FILL[b.mood] || BUBBLE_FILL.neutral} opacity={0.92} />
+          <text x={pos[i].x} y={pos[i].y - 3} textAnchor="middle"
+            style={{ fontSize: Math.max(9, b.r / 3.4), fontWeight: 600, fill: BUBBLE_TEXT[b.mood] || "#444" }}>
+            {b.word.length > Math.floor(b.r / 3.2) ? b.word.slice(0, Math.max(4, Math.floor(b.r / 3.2))) + "…" : b.word}
+          </text>
+          <text x={pos[i].x} y={pos[i].y + Math.max(10, b.r / 3)} textAnchor="middle"
+            style={{ fontSize: Math.max(8, b.r / 4), fill: BUBBLE_TEXT[b.mood] || "#444" }}>
+            {b.n}
+          </text>
+        </g>
+      ))}
+    </svg>
+  );
+}
+
 function Mood({ m }: { m: string }) {
   return <span style={{ fontSize: 11, fontWeight: 500, color: moodColor(m), background: moodBg(m), padding: "2px 8px", borderRadius: 10 }}>{m}</span>;
 }
@@ -295,6 +352,22 @@ export default function ProjectDetailPage() {
                 <div style={{ fontSize: 22, fontWeight: 500 }}>{s.pages} · {s.topics}</div>
               </div>
             </div>
+
+            {/* Topic bubbles */}
+            {topClusters.length > 2 && (
+              <div className="card" style={{ marginBottom: 14 }}>
+                <div className="spread" style={{ marginBottom: 2 }}>
+                  <span style={{ fontSize: 15, fontWeight: 500 }}>What one topic best describes the market?</span>
+                  <div className="row" style={{ gap: 8, fontSize: 11 }}>
+                    <span><span style={{ display: "inline-block", width: 9, height: 9, borderRadius: 5, background: "#7A9A3C", marginRight: 4 }} />Positive</span>
+                    <span><span style={{ display: "inline-block", width: 9, height: 9, borderRadius: 5, background: "#E8952F", marginRight: 4 }} />Negative</span>
+                    <span><span style={{ display: "inline-block", width: 9, height: 9, borderRadius: 5, background: "#D8D4C0", marginRight: 4 }} />Neutral</span>
+                  </div>
+                </div>
+                <div className="muted" style={{ fontSize: 12, marginBottom: 8 }}>Bubble size = engagement · number = posts · hover for the full topic.</div>
+                <WordBubbles topics={(velo?.topics ?? []).filter((t: any) => !String(t.label || "").startsWith("(media"))} />
+              </div>
+            )}
 
             {/* Engagement clusters (replaces engagement-over-time) */}
             {topClusters.length > 0 && (
