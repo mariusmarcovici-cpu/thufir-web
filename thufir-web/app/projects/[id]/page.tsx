@@ -207,16 +207,4 @@ export default function ProjectDetailPage() {
         <div className="card">
           <div style={{ fontSize: 15, fontWeight: 500, marginBottom: 4 }}>Sources</div>
           <p className="muted" style={{ fontSize: 12, margin: "0 0 10px" }}>One URL per line. News/RSS feeds and public Facebook page URLs. Facebook uses your Apify credits.</p>
-          <textarea className="input" style={{ minHeight: 110, fontFamily: "monospace", fontSize: 12, resize: "vertical" }} value={urls} onChange={(e) => setUrls(e.target.value)} />
-          <div className="row" style={{ gap: 9, marginTop: 10 }}>
-            <button className="btn btn-primary" disabled={busy} onClick={() => run(`/projects/${id}/sources`, { urls: urls.split("\n").map((u) => u.trim()).filter((u) => u.startsWith("http")) })}>
-              {busy ? "Collecting…" : "Add sources & collect"}
-            </button>
-          </div>
-          {result && <div className="alert" style={{ background: "var(--success-bg)", color: "var(--success-text)", marginTop: 12 }}>{result}</div>}
-          {error && <div className="alert alert-danger" style={{ marginTop: 12 }}>{error}</div>}
-        </div>
-      </div>
-    </>
-  );
-}
+          <textarea
