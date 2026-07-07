@@ -32,49 +32,55 @@ export default function ProjectDetailPage() {
   const [project, setProject] = useState<any>(null);
   const [velocity, setVelocity] = useState<any>(null);
   const [board, setBoard] = useState<any[]>([]);
+  const [disc, setDisc] = useState<any>({ topics: [], domains: [], pages: [] });
   const [urls, setUrls] = useState("https://stluciatimes.com/feed/\n");
   const [busy, setBusy] = useState(false);
+  const [scouting, setScouting] = useState(false);
+  const [scoutMsg, setScoutMsg] = useState<string | null>(null);
   const [result, setResult] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const loadAll = useCallback(async () => {
     if (!id) return;
     try {
-      const [p, v, b] = await Promise.all([
+      const [p, v, b, d] = await Promise.all([
         call(`/projects/${id}`, "GET"),
         call(`/projects/${id}/velocity/topics?window=30d`, "GET"),
         call(`/projects/${id}/entities/leaderboard`, "GET").catch(() => ({ entities: [] })),
+        call(`/projects/${id}/discovered`, "GET").catch(() => ({ topics: [], domains: [], pages: [] })),
       ]);
-      setProject(p);
-      setVelocity(v);
-      setBoard(b.entities || []);
-    } catch {
-      setError("Couldn't load this project.");
-    }
+      setProject(p); setVelocity(v); setBoard(b.entities || []);
+      setDisc({ topics: d.topics || [], domains: d.domains || [], pages: d.pages || [] });
+    } catch { setError("Couldn't load this project."); }
   }, [id]);
 
   useEffect(() => { if (user) loadAll(); }, [user, loadAll]);
 
-  function summarise(r: any): string {
-    const news = r?.news?.new_items ?? 0;
-    const fb = r?.facebook?.new_items ?? 0;
-    const realPosts = r?.facebook?.real_posts;
-    const fbNote = r?.facebook?.error ? ` (Facebook: ${r.facebook.error})` : r?.facebook?.skipped ? ` (Facebook: ${r.facebook.skipped})` : "";
-    const seen = realPosts != null ? ` (${realPosts} posts scanned)` : "";
-    return `Collected ${news} new news item${news === 1 ? "" : "s"} and ${fb} new Facebook post${fb === 1 ? "" : "s"}${seen}.${fbNote}`;
+  async function scout() {
+    setScouting(true); setError(null); setScoutMsg(null);
+    try {
+      const r = await call(`/projects/${id}/discover?expand=true`, "POST");
+      if (r.error) { setError(`Scout error: ${r.error}`); }
+      else {
+        const a = r.assessment || {};
+        setScoutMsg(`Scouted ${a.anchors_scouted} anchor pages · read ${a.posts_read} posts · found ${a.topics_found} topics, ${a.domains_found} sources, ${a.pages_discovered} new pages.`);
+      }
+      await loadAll();
+    } catch (e: any) { setError(e.message || "Scout failed."); }
+    finally { setScouting(false); }
   }
 
   async function run(path: string, body?: any) {
     setBusy(true); setError(null); setResult(null);
     try {
       const r = await call(path, "POST", body);
-      setResult(summarise(r));
+      const news = r?.news?.new_items ?? 0, fb = r?.facebook?.new_items ?? 0;
+      const scanned = r?.facebook?.real_posts != null ? ` (${r.facebook.real_posts} posts scanned)` : "";
+      const note = r?.facebook?.error ? ` (Facebook: ${r.facebook.error})` : r?.facebook?.skipped ? ` (Facebook: ${r.facebook.skipped})` : "";
+      setResult(`Collected ${news} new news and ${fb} new Facebook post${fb === 1 ? "" : "s"}${scanned}.${note}`);
       await loadAll();
-    } catch (e: any) {
-      setError(e.message || "Collection failed.");
-    } finally {
-      setBusy(false);
-    }
+    } catch (e: any) { setError(e.message || "Collection failed."); }
+    finally { setBusy(false); }
   }
 
   if (loading || !user) return <div className="center-screen"><div className="spinner" aria-label="Loading" /></div>;
@@ -103,6 +109,52 @@ export default function ProjectDetailPage() {
             </div>
           </>
         )}
+
+        {/* Market scout */}
+        <div className="card" style={{ marginBottom: 14, border: "1px solid var(--border-accent, #CFDDEA)" }}>
+          <div className="spread" style={{ marginBottom: 4 }}>
+            <span style={{ fontSize: 15, fontWeight: 500 }}>Market scout</span>
+            <button className="btn btn-primary" disabled={scouting} onClick={scout}>{scouting ? "Scouting…" : "Scout the market"}</button>
+          </div>
+          <div className="muted" style={{ fontSize: 12, marginBottom: disc.topics.length || disc.pages.length ? 12 : 0 }}>
+            Reads your anchor pages, maps the topics and sources they cluster around, then searches those topics to surface new pages. Uses Apify credit.
+          </div>
+          {scoutMsg && <div className="alert" style={{ background: "var(--success-bg)", color: "var(--success-text)", marginBottom: 12 }}>{scoutMsg}</div>}
+
+          {disc.topics.length > 0 && (
+            <div style={{ marginBottom: 12 }}>
+              <div className="muted" style={{ fontSize: 12, marginBottom: 6 }}>Dominant topics</div>
+              <div className="row" style={{ gap: 6, flexWrap: "wrap" }}>
+                {disc.topics.slice(0, 18).map((t: any) => (
+                  <span key={t.ref} className="chip">#{t.ref} <span className="muted">· {t.co_count}</span></span>
+                ))}
+              </div>
+            </div>
+          )}
+          {disc.pages.length > 0 && (
+            <div style={{ marginBottom: disc.domains.length ? 12 : 0 }}>
+              <div className="muted" style={{ fontSize: 12, marginBottom: 6 }}>Discovered pages ({disc.pages.length})</div>
+              <div className="stack" style={{ gap: 6 }}>
+                {disc.pages.slice(0, 12).map((p: any) => (
+                  <div key={p.ref} className="spread" style={{ fontSize: 13, borderBottom: "0.5px solid var(--border-soft)", paddingBottom: 5 }}>
+                    <a href={p.ref} target="_blank" rel="noreferrer" style={{ color: "var(--accent)" }}>{p.ref.replace("https://www.facebook.com/", "")}</a>
+                    <span className="muted">{p.co_count}× {p.meta ? `· ${p.meta}` : ""}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+          {disc.domains.length > 0 && (
+            <div>
+              <div className="muted" style={{ fontSize: 12, marginBottom: 6 }}>Shared sources</div>
+              <div className="row" style={{ gap: 6, flexWrap: "wrap" }}>
+                {disc.domains.slice(0, 12).map((d: any) => (
+                  <span key={d.ref} className="chip">{d.ref} <span className="muted">· {d.co_count}</span></span>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
 
         {/* Engagement leaderboard */}
         {board.length > 0 && (
@@ -148,7 +200,7 @@ export default function ProjectDetailPage() {
                 </BarChart>
               </ResponsiveContainer>
             </div>
-          ) : <div className="muted" style={{ fontSize: 13, padding: "12px 0" }}>No data yet — add your sources below and collect.</div>}
+          ) : <div className="muted" style={{ fontSize: 13, padding: "12px 0" }}>No data yet — add sources below and collect.</div>}
         </div>
 
         {/* Sources */}
