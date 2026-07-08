@@ -95,6 +95,7 @@ export default function ProjectDetailPage() {
   const params = useParams();
   const router = useRouter();
   const id = params.id as string;
+  const idValid = !!id && id !== "undefined" && id !== "null";
 
   const [view, setView] = useState<"dash" | "duel">("dash");
   const [project, setProject] = useState<any>(null);
@@ -116,6 +117,7 @@ export default function ProjectDetailPage() {
   const [folSeries, setFolSeries] = useState<any>(null);
 
   const analyze = useCallback(async (elena = false) => {
+    if (!idValid) return;
     setAnalyzing(true); setError(null);
     try {
       const r = await call(`/projects/${id}/analyze${elena ? "?elena=true" : ""}`, "POST");
@@ -140,7 +142,7 @@ export default function ProjectDetailPage() {
     } catch { setError("Couldn't load this project."); }
   }, [id]);
 
-  useEffect(() => { if (user) { loadMeta(); analyze(); } }, [user, loadMeta, analyze]);
+  useEffect(() => { if (user && idValid) { loadMeta(); analyze(); } }, [user, idValid, loadMeta, analyze]);
 
   useEffect(() => {
     const ps = ana?.page_series || [];
@@ -160,6 +162,7 @@ export default function ProjectDetailPage() {
   }
 
   async function rebuildIndex() {
+    if (!idValid) return;
     setReproc(true); setError(null); setMsg(null);
     try {
       const r = await call(`/projects/${id}/reprocess`, "POST");
@@ -171,6 +174,7 @@ export default function ProjectDetailPage() {
   }
 
   async function scout() {
+    if (!idValid) return;
     setScouting(true); setError(null); setMsg(null);
     try {
       const r = await call(`/projects/${id}/discover?expand=true`, "POST");
@@ -182,6 +186,8 @@ export default function ProjectDetailPage() {
   }
 
   async function collect() {
+    if (!idValid) return;
+    if (!window.confirm("This runs a fresh paid Apify scrape. The daily scheduler already collects once a day automatically — only collect manually if you need up-to-the-minute data. Continue?")) return;
     setBusy(true); setError(null); setMsg(null);
     try {
       const r = await call(`/projects/${id}/sources`, "POST", { urls: urls.split("\n").map((u) => u.trim()).filter((u) => u.startsWith("http")) });
@@ -193,6 +199,15 @@ export default function ProjectDetailPage() {
   }
 
   if (loading || !user) return <div className="center-screen"><div className="spinner" aria-label="Loading" /></div>;
+  if (!idValid) return (
+    <><TopBar /><div className="page" style={{ maxWidth: 640 }}>
+      <div className="card" style={{ textAlign: "center" }}>
+        <div style={{ fontSize: 16, fontWeight: 500, marginBottom: 6 }}>Project not found</div>
+        <div className="muted" style={{ fontSize: 13, marginBottom: 14 }}>This link is missing a valid project ID. Head back and pick your project from the list.</div>
+        <button className="btn btn-primary" onClick={() => router.push("/projects")}>&larr; Back to Projects</button>
+      </div>
+    </div></>
+  );
 
   const s = ana?.summary;
   const pulse = ana?.pulse;
