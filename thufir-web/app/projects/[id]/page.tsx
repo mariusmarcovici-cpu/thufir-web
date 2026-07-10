@@ -20,14 +20,16 @@ async function call(path: string, method: "GET" | "POST", body?: any) {
   return res.json();
 }
 
-const moodColor = (m: string) => m === "positive" ? "#1D9E75" : m === "negative" ? "#D85A30" : "#888780";
-const moodBg = (m: string) => m === "positive" ? "#E1F5EE" : m === "negative" ? "#FAECE7" : "#F1EFE8";
-const LINE_COLORS = ["#2a78d6", "#1baf7a", "#eda100", "#d4537e", "#7f77dd", "#d85a30"];
-const CAT_COLORS: any = { politics: "#2a78d6", economy: "#1baf7a", "crime/safety": "#d85a30", "culture/carnival": "#d4537e", "weather/disaster": "#eda100", sports: "#7f77dd", community: "#888780" };
+const moodColor = (m: string) => m === "positive" ? "#8FBFA6" : m === "negative" ? "#C98A8A" : "#8B949E";
+const moodBg = (m: string) => m === "positive" ? "rgba(66,122,91,0.16)" : m === "negative" ? "rgba(158,59,59,0.16)" : "rgba(139,148,158,0.12)";
+const LINE_COLORS = ["#C2A34F", "#4A6B8C", "#427A5B", "#B89340", "#9E3B3B", "#8B949E"];
+const CAT_COLORS: any = { politics: "#4A6B8C", economy: "#427A5B", "crime/safety": "#9E3B3B", "culture/carnival": "#C2A34F", "weather/disaster": "#B89340", sports: "#6E8CA0", community: "#8B949E" };
+const MONO = { fontFamily: "var(--font-mono)", fontVariantNumeric: "tabular-nums" } as const;
+const TOOLTIP_STYLE = { contentStyle: { background: "#0D0E12", border: "1px solid #C2A34F", borderRadius: 2, fontFamily: "var(--font-mono)", fontSize: 11, color: "#E4E7EB" }, labelStyle: { color: "#8B949E", fontFamily: "var(--font-mono)" }, itemStyle: { color: "#E4E7EB" } } as const;
 
 
-const BUBBLE_FILL: any = { positive: "#7A9A3C", negative: "#E8952F", neutral: "#D8D4C0" };
-const BUBBLE_TEXT: any = { positive: "#1d2a08", negative: "#4a2c00", neutral: "#555248" };
+const BUBBLE_FILL: any = { positive: "#427A5B", negative: "#9E3B3B", neutral: "#3A3E47" };
+const BUBBLE_TEXT: any = { positive: "#E4E7EB", negative: "#E4E7EB", neutral: "#B6BCC4" };
 
 function packBubbles(items: { r: number }[], W: number, H: number) {
   const placed: { x: number; y: number; r: number }[] = [];
@@ -69,11 +71,11 @@ function WordBubbles({ topics }: { topics: any[] }) {
           <title>{b.full} — {b.n} posts · {b.eng.toLocaleString()} engagement · {b.mood}</title>
           <circle cx={pos[i].x} cy={pos[i].y} r={b.r} fill={BUBBLE_FILL[b.mood] || BUBBLE_FILL.neutral} opacity={0.92} />
           <text x={pos[i].x} y={pos[i].y - 3} textAnchor="middle"
-            style={{ fontSize: Math.max(9, b.r / 3.4), fontWeight: 600, fill: BUBBLE_TEXT[b.mood] || "#444" }}>
+            style={{ fontSize: Math.max(9, b.r / 3.4), fontWeight: 600, fill: BUBBLE_TEXT[b.mood] || "#B6BCC4" }}>
             {b.word.length > Math.floor(b.r / 3.2) ? b.word.slice(0, Math.max(4, Math.floor(b.r / 3.2))) + "…" : b.word}
           </text>
           <text x={pos[i].x} y={pos[i].y + Math.max(10, b.r / 3)} textAnchor="middle"
-            style={{ fontSize: Math.max(8, b.r / 4), fill: BUBBLE_TEXT[b.mood] || "#444" }}>
+            style={{ fontSize: Math.max(8, b.r / 4), fill: BUBBLE_TEXT[b.mood] || "#B6BCC4", fontFamily: "var(--font-mono)" }}>
             {b.n}
           </text>
         </g>
@@ -239,7 +241,7 @@ export default function ProjectDetailPage() {
               <div className="row" style={{ gap: 6, flexWrap: "wrap" }}>
                 <span className="chip">{project.project.region_label}</span>
                 {(project.project.languages || []).map((l: string) => <span key={l} className="chip">{l}</span>)}
-                {pulseLabel && <span className="chip" style={{ background: pulse.intensity === "intense" ? "#FAECE7" : pulse.intensity === "calm" ? "#E1F5EE" : undefined, fontWeight: 500 }}>Pulse: {pulseLabel}</span>}
+                {pulseLabel && <span className="chip" style={{ background: pulse.intensity === "intense" ? "rgba(158,59,59,0.16)" : pulse.intensity === "calm" ? "rgba(66,122,91,0.16)" : undefined, fontWeight: 500 }}>Pulse: {pulseLabel}</span>}
               </div>
             </div>
             <div className="row" style={{ gap: 8 }}>
@@ -292,8 +294,8 @@ export default function ProjectDetailPage() {
                       ].map(([label, a, b]: any) => (
                         <tr key={label} style={{ borderBottom: "0.5px solid var(--border-soft)" }}>
                           <td style={{ padding: "6px 4px" }}>{label}</td>
-                          <td style={{ textAlign: "right", padding: "6px 4px", fontWeight: a >= b ? 600 : 400 }}>{Number(a).toLocaleString()}</td>
-                          <td style={{ textAlign: "right", padding: "6px 4px", fontWeight: b >= a ? 600 : 400 }}>{Number(b).toLocaleString()}</td>
+                          <td style={{ ...MONO, textAlign: "right", padding: "6px 4px", fontWeight: a >= b ? 600 : 400 }}>{Number(a).toLocaleString()}</td>
+                          <td style={{ ...MONO, textAlign: "right", padding: "6px 4px", fontWeight: b >= a ? 600 : 400 }}>{Number(b).toLocaleString()}</td>
                         </tr>
                       ))}
                       <tr>
@@ -320,7 +322,7 @@ export default function ProjectDetailPage() {
                         <CartesianGrid strokeDasharray="3 3" stroke="var(--border-soft)" vertical={false} />
                         <XAxis dataKey="day" tick={{ fontSize: 10, fill: "var(--muted)" }} tickFormatter={(d) => d.slice(5)} />
                         <YAxis tick={{ fontSize: 10, fill: "var(--muted)" }} allowDecimals={false} />
-                        <Tooltip />
+                        <Tooltip {...TOOLTIP_STYLE} />
                         <Legend wrapperStyle={{ fontSize: 11 }} />
                         <Line type="monotone" dataKey={A.page} stroke={LINE_COLORS[0]} strokeWidth={2} dot={false} />
                         <Line type="monotone" dataKey={B.page} stroke={LINE_COLORS[3]} strokeWidth={2} dot={false} />
@@ -364,7 +366,7 @@ export default function ProjectDetailPage() {
                             <CartesianGrid strokeDasharray="3 3" stroke="var(--border-soft)" vertical={false} />
                             <XAxis dataKey="day" tick={{ fontSize: 10, fill: "var(--muted)" }} tickFormatter={(d) => d.slice(5)} />
                             <YAxis tick={{ fontSize: 10, fill: "var(--muted)" }} domain={["auto", "auto"]} />
-                            <Tooltip />
+                            <Tooltip {...TOOLTIP_STYLE} />
                             <Legend wrapperStyle={{ fontSize: 11 }} />
                             <Line type="monotone" dataKey={A.page} stroke={LINE_COLORS[0]} strokeWidth={2} dot connectNulls />
                             <Line type="monotone" dataKey={B.page} stroke={LINE_COLORS[3]} strokeWidth={2} dot connectNulls />
@@ -390,15 +392,15 @@ export default function ProjectDetailPage() {
               </div>
               <div className="card" style={{ padding: "14px 16px" }}>
                 <div className="muted" style={{ fontSize: 12, marginBottom: 4 }}>Posts analysed</div>
-                <div style={{ fontSize: 22, fontWeight: 500 }}>{s.posts_analysed}</div>
+                <div style={{ ...MONO, fontSize: 22, fontWeight: 500 }}>{s.posts_analysed}</div>
               </div>
               <div className="card" style={{ padding: "14px 16px" }}>
                 <div className="muted" style={{ fontSize: 12, marginBottom: 4 }}>Total engagement</div>
-                <div style={{ fontSize: 22, fontWeight: 500 }}>{s.total_engagement.toLocaleString()}</div>
+                <div style={{ ...MONO, fontSize: 22, fontWeight: 500 }}>{s.total_engagement.toLocaleString()}</div>
               </div>
               <div className="card" style={{ padding: "14px 16px" }}>
                 <div className="muted" style={{ fontSize: 12, marginBottom: 4 }}>Pages · topics</div>
-                <div style={{ fontSize: 22, fontWeight: 500 }}>{s.pages} · {s.topics}</div>
+                <div style={{ ...MONO, fontSize: 22, fontWeight: 500 }}>{s.pages} · {s.topics}</div>
               </div>
             </div>
 
@@ -408,9 +410,9 @@ export default function ProjectDetailPage() {
                 <div className="spread" style={{ marginBottom: 2 }}>
                   <span style={{ fontSize: 15, fontWeight: 500 }}>What one topic best describes the market?</span>
                   <div className="row" style={{ gap: 8, fontSize: 11 }}>
-                    <span><span style={{ display: "inline-block", width: 9, height: 9, borderRadius: 5, background: "#7A9A3C", marginRight: 4 }} />Positive</span>
-                    <span><span style={{ display: "inline-block", width: 9, height: 9, borderRadius: 5, background: "#E8952F", marginRight: 4 }} />Negative</span>
-                    <span><span style={{ display: "inline-block", width: 9, height: 9, borderRadius: 5, background: "#D8D4C0", marginRight: 4 }} />Neutral</span>
+                    <span><span style={{ display: "inline-block", width: 9, height: 9, borderRadius: 5, background: "#427A5B", marginRight: 4 }} />Positive</span>
+                    <span><span style={{ display: "inline-block", width: 9, height: 9, borderRadius: 5, background: "#9E3B3B", marginRight: 4 }} />Negative</span>
+                    <span><span style={{ display: "inline-block", width: 9, height: 9, borderRadius: 5, background: "#3A3E47", marginRight: 4 }} />Neutral</span>
                   </div>
                 </div>
                 <div className="muted" style={{ fontSize: 12, marginBottom: 8 }}>Bubble size = engagement · number = posts · hover for the full topic.</div>
@@ -434,12 +436,12 @@ export default function ProjectDetailPage() {
                           {t.label}
                           {t.category && <span style={{ marginLeft: 6, fontSize: 10, color: CAT_COLORS[t.category] || "var(--muted)", border: `1px solid ${CAT_COLORS[t.category] || "var(--border-soft)"}`, padding: "1px 6px", borderRadius: 8 }}>{t.category}</span>}
                         </span>
-                        <span className="muted">{(t.engagement || 0).toLocaleString()} eng</span>
+                        <span className="muted" style={MONO}>{(t.engagement || 0).toLocaleString()} eng</span>
                       </div>
                       <div style={{ height: 7, background: "var(--border-soft)", borderRadius: 4, overflow: "hidden" }}>
                         <div style={{ width: `${Math.round(((t.engagement || 0) / maxClusterEng) * 100)}%`, height: "100%", background: CAT_COLORS[t.category] || "var(--accent)" }} />
                       </div>
-                      <div className="muted" style={{ fontSize: 11, marginTop: 2 }}>{t.posts} posts · {t.pages_talking} pages talking</div>
+                      <div className="muted" style={{ ...MONO, fontSize: 11, marginTop: 2 }}>{t.posts} posts · {t.pages_talking} pages talking</div>
                     </div>
                   ))}
                 </div>
@@ -463,12 +465,12 @@ export default function ProjectDetailPage() {
                     <div key={e.entity_id || e.page}>
                       <div className="spread" style={{ fontSize: 13, marginBottom: 3 }}>
                         <span style={{ fontWeight: 500 }}>{i + 1}. <Ext href={e.page_url}>{e.page || e.display_name}</Ext> &nbsp;<Mood m={e.mood} /></span>
-                        <span className="muted">{e.engagement.toLocaleString()} eng · {(e.share_of_voice_pct ?? 0).toFixed(1)}% SoV</span>
+                        <span className="muted" style={MONO}>{e.engagement.toLocaleString()} eng · {(e.share_of_voice_pct ?? 0).toFixed(1)}% SoV</span>
                       </div>
                       <div style={{ height: 8, background: "var(--border-soft)", borderRadius: 4, overflow: "hidden" }}>
                         <div style={{ width: `${Math.round((e.engagement / maxEng) * 100)}%`, height: "100%", background: "var(--accent)" }} />
                       </div>
-                      <div className="muted" style={{ fontSize: 11, marginTop: 3 }}>{e.likes.toLocaleString()} reactions · {e.shares.toLocaleString()} shares · {e.views.toLocaleString()} views</div>
+                      <div className="muted" style={{ ...MONO, fontSize: 11, marginTop: 3 }}>{e.likes.toLocaleString()} reactions · {e.shares.toLocaleString()} shares · {e.views.toLocaleString()} views</div>
                       {e.best_post && (
                         <div style={{ fontSize: 12, marginTop: 4, paddingLeft: 10, borderLeft: "2px solid var(--border-soft)" }}>
                           <span className="muted">best: </span>{e.best_post.text || "(no text)"} <span className="muted">· {e.best_post.engagement.toLocaleString()} eng · </span><Ext href={e.best_post.url}>open</Ext>
@@ -515,7 +517,7 @@ export default function ProjectDetailPage() {
                           <CartesianGrid strokeDasharray="3 3" stroke="var(--border-soft)" vertical={false} />
                           <XAxis dataKey="day" tick={{ fontSize: 10, fill: "var(--muted)" }} tickFormatter={(d) => d.slice(5)} />
                           <YAxis tick={{ fontSize: 10, fill: "var(--muted)" }} allowDecimals={false} />
-                          <Tooltip />
+                          <Tooltip {...TOOLTIP_STYLE} />
                           <Legend wrapperStyle={{ fontSize: 11 }} />
                           {chosen.map((p: any, i: number) => (
                             <Line key={p.entity_id} type="monotone" dataKey={p.page} stroke={LINE_COLORS[i % LINE_COLORS.length]} strokeWidth={2} dot={false} />
@@ -546,7 +548,7 @@ export default function ProjectDetailPage() {
                             </span>
                           )}
                         </span>
-                        <span className="muted">{t.posts} posts · {t.pages_talking} pages · {(t.engagement || 0).toLocaleString()} eng</span>
+                        <span className="muted" style={MONO}>{t.posts} posts · {t.pages_talking} pages · {(t.engagement || 0).toLocaleString()} eng</span>
                       </div>
                     </div>
                   ))}
@@ -580,7 +582,7 @@ export default function ProjectDetailPage() {
                       </div>
                       <div style={{ fontSize: 13, color: "var(--text-2, #444)", marginBottom: 4 }}>{p.text || <span className="muted">(no text)</span>}</div>
                       <div className="spread" style={{ fontSize: 11 }}>
-                        <span className="muted">{p.likes.toLocaleString()} reactions · {p.shares.toLocaleString()} shares · {p.views.toLocaleString()} views · {p.engagement.toLocaleString()} total</span>
+                        <span className="muted" style={MONO}>{p.likes.toLocaleString()} reactions · {p.shares.toLocaleString()} shares · {p.views.toLocaleString()} views · {p.engagement.toLocaleString()} total</span>
                         <Ext href={p.url}>open post</Ext>
                       </div>
                     </div>
@@ -599,7 +601,7 @@ export default function ProjectDetailPage() {
               {opsEvents.length > 0 && (
                 <div style={{ fontSize: 11, marginBottom: disc.topics.length ? 12 : 0, padding: "6px 10px", background: "var(--surface-1, #f7f7f5)", borderRadius: 6 }}>
                   {opsEvents.slice(0, 3).map((e: any, i: number) => (
-                    <div key={i} className="muted">{e.ts.slice(5, 16).replace("T", " ")} · {e.kind}: {e.detail}</div>
+                    <div key={i} className="muted" style={MONO}>{e.ts.slice(5, 16).replace("T", " ")} · {e.kind}: {e.detail}</div>
                   ))}
                 </div>
               )}
