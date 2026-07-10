@@ -6,6 +6,7 @@ import { AreaChart, Area, LineChart, Line, Legend, XAxis, YAxis, CartesianGrid, 
 import { useRequireAuth } from "@/lib/auth";
 import { getToken } from "@/lib/api";
 import TopBar from "@/components/TopBar";
+import { TrendIcon, VelocityIcon, NetworkIcon } from "@/components/BrandAssets";
 
 const API = process.env.NEXT_PUBLIC_API_URL ?? "";
 
@@ -19,44 +20,6 @@ async function call(path: string, method: "GET" | "POST", body?: any) {
   if (!res.ok) { const d = await res.json().catch(() => ({})); throw new Error(d.detail || "Request failed"); }
   return res.json();
 }
-
-const TrendIcon = () => (
-  <svg width="16" height="16" viewBox="0 0 40 40" fill="none" style={{ marginRight: 8, color: "var(--amber)", flexShrink: 0 }}>
-    <line x1="10" y1="35" x2="10" y2="15" stroke="currentColor" strokeWidth="3" strokeLinecap="square" />
-    <circle cx="10" cy="11" r="3" stroke="currentColor" strokeWidth="2" />
-    <line x1="20" y1="35" x2="20" y2="8" stroke="currentColor" strokeWidth="3" strokeLinecap="square" />
-    <circle cx="20" cy="4" r="3" stroke="currentColor" strokeWidth="2" />
-    <line x1="30" y1="35" x2="30" y2="22" stroke="currentColor" strokeWidth="3" strokeLinecap="square" />
-    <circle cx="30" cy="18" r="3" stroke="currentColor" strokeWidth="2" />
-  </svg>
-);
-
-const VelocityIcon = () => (
-  <svg width="16" height="16" viewBox="0 0 40 40" fill="none" style={{ marginRight: 8, color: "var(--amber)", flexShrink: 0 }}>
-    <path d="M8 32 L32 8" stroke="currentColor" strokeWidth="3" strokeLinecap="square" />
-    <polygon points="34,6 20,8 32,20" fill="currentColor" />
-    <path d="M12 28 Q 20 25 28 12" stroke="currentColor" strokeWidth="2" strokeDasharray="2 4" />
-  </svg>
-);
-
-const NetworkIcon = () => (
-  <svg width="16" height="16" viewBox="0 0 40 40" fill="none" style={{ marginRight: 8, color: "var(--amber)", flexShrink: 0 }}>
-    <circle cx="20" cy="20" r="4" fill="currentColor" />
-    <circle cx="20" cy="6" r="2.4" stroke="currentColor" strokeWidth="1.6" />
-    <circle cx="33" cy="14" r="2.4" stroke="currentColor" strokeWidth="1.6" />
-    <circle cx="30" cy="31" r="2.4" stroke="currentColor" strokeWidth="1.6" />
-    <circle cx="10" cy="31" r="2.4" stroke="currentColor" strokeWidth="1.6" />
-    <circle cx="7" cy="14" r="2.4" stroke="currentColor" strokeWidth="1.6" />
-    <path d="M20 16 V9 M23.5 18 L30.7 15 M22.5 23.5 L28 29 M17.5 23.5 L12 29 M16.5 18 L9.3 15" stroke="currentColor" strokeWidth="1.4" />
-  </svg>
-);
-
-const EyeIcon = () => (
-  <svg width="16" height="16" viewBox="0 0 100 100" fill="none" style={{ marginRight: 8, color: "var(--amber)", flexShrink: 0 }}>
-    <path d="M10 50 Q 50 20 90 50 Q 50 80 10 50 Z" stroke="currentColor" strokeWidth="6" strokeLinejoin="miter" />
-    <circle cx="50" cy="50" r="15" fill="currentColor" />
-  </svg>
-);
 
 const moodColor = (m: string) => m === "positive" ? "#8FBFA6" : m === "negative" ? "#C98A8A" : "#8B949E";
 const moodBg = (m: string) => m === "positive" ? "rgba(66,122,91,0.16)" : m === "negative" ? "rgba(158,59,59,0.16)" : "rgba(139,148,158,0.12)";
@@ -340,7 +303,7 @@ export default function ProjectDetailPage() {
                       <div className="panel-body" style={{ padding: 0 }}>
                         <table style={{ width: "100%", fontSize: 13, borderCollapse: "collapse" }}>
                           <thead>
-                            <tr className="row-div">
+                            <tr style={{ borderBottom: "1px solid var(--carbon)" }}>
                               <th style={{ textAlign: "left", padding: "10px 16px", fontFamily: "var(--font-mono)", fontSize: 9, letterSpacing: 1.5, color: "var(--muted)", fontWeight: 500 }}>METRIC</th>
                               <th style={{ textAlign: "right", padding: "10px 16px", fontFamily: "var(--font-mono)", fontSize: 9, letterSpacing: 1, color: "#C2A34F", fontWeight: 600 }}><Ext href={A.page_url}>{A.page}</Ext></th>
                               <th style={{ textAlign: "right", padding: "10px 16px", fontFamily: "var(--font-mono)", fontSize: 9, letterSpacing: 1, color: "#4A6B8C", fontWeight: 600 }}><Ext href={B.page_url}>{B.page}</Ext></th>
@@ -355,7 +318,7 @@ export default function ProjectDetailPage() {
                               ["Total engagement", A.engagement, B.engagement],
                               ["Engagement / post", A.eng_per_post, B.eng_per_post],
                             ].map(([label, a, b]: any) => (
-                              <tr key={label} className="row-div">
+                              <tr key={label} style={{ borderBottom: "1px solid var(--rowline)" }}>
                                 <td style={{ padding: "9px 16px", fontSize: 12 }}>{label}</td>
                                 <td style={{ ...MONO, textAlign: "right", padding: "9px 16px", fontSize: 13, fontWeight: a >= b ? 700 : 400, color: a >= b ? "var(--text)" : "var(--muted)" }}>{Number(a).toLocaleString()}</td>
                                 <td style={{ ...MONO, textAlign: "right", padding: "9px 16px", fontSize: 13, fontWeight: b >= a ? 700 : 400, color: b >= a ? "var(--text)" : "var(--muted)" }}>{Number(b).toLocaleString()}</td>
@@ -459,44 +422,42 @@ export default function ProjectDetailPage() {
           {view === "dash" && s && (
             <>
               {/* Row 1 — summary stats */}
-              <div className="panel">
-                <div className="stat-grid">
-                  <div className="stat-cell">
-                    <div className="stat-label">Overall mood</div>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 1, background: "var(--carbon)", border: "1px solid var(--carbon)" }}>
+                  <div style={{ background: "var(--console)", padding: "18px 20px" }}>
+                    <div className="stat-label" style={{ marginBottom: 10 }}>Overall mood</div>
                     <div className="stat-value" style={{ color: moodColor(s.overall_mood) }}>{s.overall_mood}</div>
                     <div className="stat-sub">{s.tone_engine === "elena-gemini" ? "Elena · Gemini" : "keyword tone"}</div>
                   </div>
-                  <div className="stat-cell">
-                    <div className="stat-label">Posts analysed</div>
+                  <div style={{ background: "var(--console)", padding: "18px 20px" }}>
+                    <div className="stat-label" style={{ marginBottom: 10 }}>Posts analysed</div>
                     <div className="stat-value">{s.posts_analysed}</div>
                     <div className="stat-sub">across {s.pages} pages</div>
                   </div>
-                  <div className="stat-cell">
-                    <div className="stat-label">Total engagement</div>
+                  <div style={{ background: "var(--console)", padding: "18px 20px" }}>
+                    <div className="stat-label" style={{ marginBottom: 10 }}>Total engagement</div>
                     <div className="stat-value">{s.total_engagement.toLocaleString()}</div>
                     <div className="stat-sub">reactions · shares · views</div>
                   </div>
-                  <div className="stat-cell">
-                    <div className="stat-label">Pages · topics</div>
+                  <div style={{ background: "var(--console)", padding: "18px 20px" }}>
+                    <div className="stat-label" style={{ marginBottom: 10 }}>Pages · topics</div>
                     <div className="stat-value">{s.pages} · {s.topics}</div>
                     <div className="stat-sub">semantic index</div>
                   </div>
-                </div>
               </div>
 
               {/* Row 2 — topic map · clusters · scout */}
               <div className="ops-row">
                 <div className="panel" style={{ flex: 40 }}>
                   <div className="panel-head"><TrendIcon />Topic map
-                    <span className="ph-right muted" style={{ fontSize: 11, fontFamily: "var(--font)" }}>What one topic best describes the market?</span>
+                    <span className="ph-right muted" style={{ fontSize: 12, fontFamily: "var(--font)", letterSpacing: 0 }}>What one topic best describes the market?</span>
                   </div>
-                  <div className="panel-body">
+                  <div className="panel-body" style={{ padding: 8 }}>
                     {allTopics.length > 2 ? <WordBubbles topics={allTopics} /> : <div className="muted" style={{ fontSize: 12 }}>Run &quot;Rebuild semantic index&quot; to build the map.</div>}
                   </div>
-                  <div style={{ display: "flex", gap: 16, padding: "10px 16px", borderTop: "1px solid var(--carbon)", fontFamily: "var(--font-mono)", fontSize: 9, letterSpacing: 1.5, color: "var(--muted)" }}>
-                    <span><span style={{ display: "inline-block", width: 8, height: 8, background: "#427A5B", marginRight: 6 }} />POSITIVE</span>
-                    <span><span style={{ display: "inline-block", width: 8, height: 8, background: "#9E3B3B", marginRight: 6 }} />NEGATIVE</span>
-                    <span><span style={{ display: "inline-block", width: 8, height: 8, background: "#3A3E47", marginRight: 6 }} />NEUTRAL</span>
+                  <div style={{ display: "flex", gap: 18, padding: "10px 16px", borderTop: "1px solid var(--carbon)", fontFamily: "var(--font-mono)", fontSize: 10, letterSpacing: 1, color: "var(--muted)" }}>
+                    <span><span style={{ display: "inline-block", width: 9, height: 9, background: "#427A5B", marginRight: 6 }} />POSITIVE</span>
+                    <span><span style={{ display: "inline-block", width: 9, height: 9, background: "#9E3B3B", marginRight: 6 }} />NEGATIVE</span>
+                    <span><span style={{ display: "inline-block", width: 9, height: 9, background: "#3A3E47", marginRight: 6 }} />NEUTRAL</span>
                   </div>
                 </div>
 
@@ -504,20 +465,20 @@ export default function ProjectDetailPage() {
                   <div className="panel-head"><NetworkIcon />Engagement clusters
                     {velo?.network_integrity != null && <span className="ph-right"><span className="chip" style={{ color: "#8FBFA6" }}>NETWORK INTEGRITY {Math.round(velo.network_integrity * 100)}%</span></span>}
                   </div>
-                  <div className="panel-body" style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+                  <div className="panel-body" style={{ padding: "6px 16px", display: "flex", flexDirection: "column", justifyContent: "space-between" }}>
                     {topClusters.map((t: any) => (
-                      <div key={t.topic_cluster_id}>
-                        <div className="spread" style={{ fontSize: 13, marginBottom: 3, gap: 8 }}>
-                          <span style={{ minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                            {t.label}
-                            {t.category && <span className="chip" style={{ marginLeft: 6, fontSize: 9, padding: "1px 5px" }}>{t.category}</span>}
-                          </span>
-                          <span style={{ ...MONO, color: "var(--amber)", flexShrink: 0 }}>{(t.engagement || 0).toLocaleString()}</span>
+                      <div key={t.topic_cluster_id} style={{ padding: "9px 0", borderBottom: "1px solid var(--rowline)" }}>
+                        <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 8, marginBottom: 6 }}>
+                          <div style={{ display: "flex", alignItems: "baseline", gap: 8, minWidth: 0 }}>
+                            <span style={{ fontSize: 13, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{t.label}</span>
+                            {t.category && <span style={{ ...MONO, fontSize: 9, letterSpacing: 0.5, color: "var(--muted)", border: "1px solid var(--carbon)", padding: "1px 5px", whiteSpace: "nowrap" }}>{t.category}</span>}
+                          </div>
+                          <span style={{ ...MONO, fontSize: 13, color: "var(--amber)", whiteSpace: "nowrap" }}>{(t.engagement || 0).toLocaleString()}</span>
                         </div>
-                        <div style={{ height: 4, background: "var(--void)", overflow: "hidden" }}>
+                        <div style={{ height: 4, background: "var(--void)", marginBottom: 5 }}>
                           <div style={{ width: `${Math.round(((t.engagement || 0) / maxClusterEng) * 100)}%`, height: "100%", background: "var(--amber)" }} />
                         </div>
-                        <div className="muted" style={{ ...MONO, fontSize: 10, marginTop: 3 }}>{t.posts} posts · {t.pages_talking} pages talking</div>
+                        <div style={{ ...MONO, fontSize: 10, color: "var(--muted)" }}>{t.posts} posts · {t.pages_talking} pages talking</div>
                       </div>
                     ))}
                   </div>
@@ -566,25 +527,28 @@ export default function ProjectDetailPage() {
                   </div>
                   <div className="panel-body" style={{ padding: 0 }}>
                     {board.map((e: any, i: number) => (
-                      <div key={e.entity_id || e.page} className="row-div" style={{ display: "flex", gap: 14, padding: "10px 16px" }}>
+                      <div key={e.entity_id || e.page} style={{ display: "flex", alignItems: "flex-start", gap: 14, padding: "10px 16px", borderBottom: "1px solid var(--rowline)" }}>
+                        <span style={{ ...MONO, fontSize: 14, color: "var(--amber)", width: 22, textAlign: "right", paddingTop: 1, flexShrink: 0 }}>{i + 1}</span>
                         <div style={{ flex: 1, minWidth: 0 }}>
-                          <div style={{ fontSize: 13, marginBottom: 2 }}>
-                            <span style={{ ...MONO, color: "var(--amber)", fontSize: 14, marginRight: 8 }}>{i + 1}</span>
-                            <Ext href={e.page_url}>{e.page || e.display_name}</Ext> &nbsp;<Mood m={e.mood} />
+                          <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 5 }}>
+                            <span style={{ fontSize: 13 }}><Ext href={e.page_url}>{e.page || e.display_name}</Ext></span>
+                            <Mood m={e.mood} />
                           </div>
-                          <div className="muted" style={{ ...MONO, fontSize: 10 }}>{e.likes.toLocaleString()} reactions · {e.shares.toLocaleString()} shares · {e.views.toLocaleString()} views</div>
+                          <div style={{ ...MONO, fontSize: 10, color: "var(--muted)" }}>{e.likes.toLocaleString()} reactions · {e.shares.toLocaleString()} shares · {e.views.toLocaleString()} views</div>
                           {e.best_post && (
-                            <div style={{ fontSize: 11, marginTop: 3, color: "var(--text-2)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                              &quot;{e.best_post.text || "(no text)"}&quot; <span className="muted" style={MONO}>· {e.best_post.engagement.toLocaleString()}</span> <Ext href={e.best_post.url}>open</Ext>
+                            <div style={{ display: "flex", alignItems: "baseline", gap: 8, marginTop: 6 }}>
+                              <span style={{ ...MONO, fontSize: 10, color: "var(--muted)", maxWidth: 340, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>&quot;{e.best_post.text || "(no text)"}&quot;</span>
+                              <span style={{ ...MONO, fontSize: 10, color: "var(--amber)" }}>{e.best_post.engagement.toLocaleString()}</span>
+                              <span style={{ ...MONO, fontSize: 10 }}><Ext href={e.best_post.url}>open</Ext></span>
                             </div>
                           )}
                         </div>
-                        <div style={{ width: 200, flexShrink: 0 }}>
-                          <div className="spread" style={{ marginBottom: 4 }}>
+                        <div style={{ width: 200, paddingTop: 2, flexShrink: 0 }}>
+                          <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 5 }}>
                             <span style={{ ...MONO, fontSize: 13 }}>{e.engagement.toLocaleString()}</span>
-                            <span style={{ ...MONO, fontSize: 11, color: "#4A6B8C" }}>{(e.share_of_voice_pct ?? 0).toFixed(1)}%</span>
+                            <span style={{ ...MONO, fontSize: 12, color: "#4A6B8C" }}>{(e.share_of_voice_pct ?? 0).toFixed(1)}%</span>
                           </div>
-                          <div style={{ height: 4, background: "var(--void)", overflow: "hidden" }}>
+                          <div style={{ height: 5, background: "var(--void)" }}>
                             <div style={{ width: `${Math.round((e.engagement / maxEng) * 100)}%`, height: "100%", background: i === 0 ? "var(--amber)" : "var(--signal)" }} />
                           </div>
                         </div>
@@ -609,7 +573,7 @@ export default function ProjectDetailPage() {
                         );
                       })}
                     </div>
-                    <div className="stat-label" style={{ marginBottom: 6 }}>Daily engagement · by day</div>
+                    <div style={{ fontFamily: "var(--font-mono)", fontSize: 9, letterSpacing: 1.5, textTransform: "uppercase" as any, color: "var(--muted)", marginBottom: 6 }}>Daily engagement · by day</div>
                     {(() => {
                       const chosen = (ana.page_series || []).filter((p: any) => picked.has(p.entity_id));
                       const days = Array.from(new Set(chosen.flatMap((p: any) => p.series.map((x: any) => x.day)))).sort() as string[];
@@ -645,12 +609,12 @@ export default function ProjectDetailPage() {
                   <div className="panel-head"><VelocityIcon />What the market is talking about</div>
                   <div className="panel-body" style={{ padding: 0 }}>
                     {allTopics.slice(0, 12).map((t: any) => (
-                      <div key={t.topic_cluster_id} className="row-div spread" style={{ padding: "8px 16px", gap: 10 }}>
-                        <span style={{ fontSize: 13, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                          {t.label}
-                          {t.category && <span className="muted" style={{ ...MONO, fontSize: 10, marginLeft: 6 }}>{t.category}</span>}
-                        </span>
-                        <span style={{ flexShrink: 0, display: "inline-flex", gap: 10, alignItems: "center" }}>
+                      <div key={t.topic_cluster_id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, padding: "8px 16px", borderBottom: "1px solid var(--rowline)" }}>
+                        <div style={{ minWidth: 0 }}>
+                          <div style={{ fontSize: 13, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{t.label}</div>
+                          {t.category && <div style={{ ...MONO, fontSize: 10, color: "var(--muted)" }}>{t.category}</div>}
+                        </div>
+                        <span style={{ flexShrink: 0, display: "inline-flex", gap: 12, alignItems: "center", whiteSpace: "nowrap" }}>
                           {t.velocity_delta_pct != null && (
                             <span style={{ ...MONO, fontSize: 11, color: t.velocity_delta_pct >= 0 ? "#427A5B" : "#9E3B3B" }}>
                               {t.velocity_delta_pct >= 0 ? "▲" : "▼"} {Math.abs(t.velocity_delta_pct)}%
@@ -667,13 +631,15 @@ export default function ProjectDetailPage() {
                   <div className="panel-head"><TrendIcon />Top posts by engagement</div>
                   <div className="panel-body" style={{ padding: 0 }}>
                     {(ana.top_posts || []).slice(0, 5).map((p: any, i: number) => (
-                      <div key={i} className="row-div" style={{ padding: "10px 16px" }}>
-                        <div className="spread" style={{ fontSize: 12, marginBottom: 3 }}>
-                          <span>{p.page} &nbsp;<Mood m={p.mood} /> <span className="muted" style={{ ...MONO, fontSize: 10, marginLeft: 6 }}>{p.day.slice(5)}</span></span>
-                          <Ext href={p.url}>open post</Ext>
+                      <div key={i} style={{ padding: "12px 16px", borderBottom: "1px solid var(--rowline)" }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 7 }}>
+                          <span style={{ fontSize: 13 }}>{p.page}</span>
+                          <Mood m={p.mood} />
+                          <span style={{ ...MONO, fontSize: 10, color: "var(--muted)" }}>{p.day.slice(5)}</span>
+                          <span style={{ ...MONO, fontSize: 10, marginLeft: "auto" }}><Ext href={p.url}>open post</Ext></span>
                         </div>
-                        <div style={{ fontSize: 12, color: "var(--text-2)", marginBottom: 3 }}>{p.text || <span className="muted">(no text)</span>}</div>
-                        <div className="muted" style={{ ...MONO, fontSize: 10 }}>{p.likes.toLocaleString()} reactions · {p.shares.toLocaleString()} shares · {p.views.toLocaleString()} views · {p.engagement.toLocaleString()} total</div>
+                        <p style={{ margin: "0 0 8px", fontSize: 12, lineHeight: 1.5, color: "#B8BEC7" }}>{p.text || <span className="muted">(no text)</span>}</p>
+                        <div style={{ ...MONO, fontSize: 10, color: "var(--muted)" }}>{p.likes.toLocaleString()} reactions · {p.shares.toLocaleString()} shares · {p.views.toLocaleString()} views · {p.engagement.toLocaleString()} total</div>
                       </div>
                     ))}
                   </div>
