@@ -20,6 +20,32 @@ async function call(path: string, method: "GET" | "POST", body?: any) {
   return res.json();
 }
 
+const TrendIcon = () => (
+  <svg width="16" height="16" viewBox="0 0 40 40" fill="none" style={{ marginRight: 8, color: "var(--amber)", flexShrink: 0 }}>
+    <line x1="10" y1="35" x2="10" y2="15" stroke="currentColor" strokeWidth="3" strokeLinecap="square" />
+    <circle cx="10" cy="11" r="3" stroke="currentColor" strokeWidth="2" />
+    <line x1="20" y1="35" x2="20" y2="8" stroke="currentColor" strokeWidth="3" strokeLinecap="square" />
+    <circle cx="20" cy="4" r="3" stroke="currentColor" strokeWidth="2" />
+    <line x1="30" y1="35" x2="30" y2="22" stroke="currentColor" strokeWidth="3" strokeLinecap="square" />
+    <circle cx="30" cy="18" r="3" stroke="currentColor" strokeWidth="2" />
+  </svg>
+);
+
+const VelocityIcon = () => (
+  <svg width="16" height="16" viewBox="0 0 40 40" fill="none" style={{ marginRight: 8, color: "var(--amber)", flexShrink: 0 }}>
+    <path d="M8 32 L32 8" stroke="currentColor" strokeWidth="3" strokeLinecap="square" />
+    <polygon points="34,6 20,8 32,20" fill="currentColor" />
+    <path d="M12 28 Q 20 25 28 12" stroke="currentColor" strokeWidth="2" strokeDasharray="2 4" />
+  </svg>
+);
+
+const EyeIcon = () => (
+  <svg width="16" height="16" viewBox="0 0 100 100" fill="none" style={{ marginRight: 8, color: "var(--amber)", flexShrink: 0 }}>
+    <path d="M10 50 Q 50 20 90 50 Q 50 80 10 50 Z" stroke="currentColor" strokeWidth="6" strokeLinejoin="miter" />
+    <circle cx="50" cy="50" r="15" fill="currentColor" />
+  </svg>
+);
+
 const moodColor = (m: string) => m === "positive" ? "#8FBFA6" : m === "negative" ? "#C98A8A" : "#8B949E";
 const moodBg = (m: string) => m === "positive" ? "rgba(66,122,91,0.16)" : m === "negative" ? "rgba(158,59,59,0.16)" : "rgba(139,148,158,0.12)";
 const LINE_COLORS = ["#C2A34F", "#4A6B8C", "#427A5B", "#B89340", "#9E3B3B", "#8B949E"];
@@ -260,7 +286,7 @@ export default function ProjectDetailPage() {
         {view === "duel" && ana?.duel?.length >= 2 && (
           <>
             <div className="card" style={{ marginBottom: 14 }}>
-              <div style={{ fontSize: 15, fontWeight: 500, marginBottom: 8 }}>Head-to-head — all metrics, two pages in parallel</div>
+              <div style={{ display: "flex", alignItems: "center", fontSize: 15, fontWeight: 500, marginBottom: 8 }}><VelocityIcon />Head-to-head — all metrics, two pages in parallel</div>
               <div className="row" style={{ gap: 10, flexWrap: "wrap" }}>
                 <select className="input" style={{ maxWidth: 320 }} value={duelA} onChange={(e) => setDuelA(e.target.value)}>
                   {ana.duel.map((d: any) => <option key={d.entity_id} value={d.entity_id}>{d.page}</option>)}
@@ -408,7 +434,7 @@ export default function ProjectDetailPage() {
             {topClusters.length > 2 && (
               <div className="card" style={{ marginBottom: 14 }}>
                 <div className="spread" style={{ marginBottom: 2 }}>
-                  <span style={{ fontSize: 15, fontWeight: 500 }}>What one topic best describes the market?</span>
+                  <span style={{ display: "inline-flex", alignItems: "center", fontSize: 15, fontWeight: 500 }}><TrendIcon />What one topic best describes the market?</span>
                   <div className="row" style={{ gap: 8, fontSize: 11 }}>
                     <span><span style={{ display: "inline-block", width: 9, height: 9, borderRadius: 5, background: "#427A5B", marginRight: 4 }} />Positive</span>
                     <span><span style={{ display: "inline-block", width: 9, height: 9, borderRadius: 5, background: "#9E3B3B", marginRight: 4 }} />Negative</span>
@@ -424,7 +450,7 @@ export default function ProjectDetailPage() {
             {topClusters.length > 0 && (
               <div className="card" style={{ marginBottom: 14 }}>
                 <div className="spread" style={{ marginBottom: 2 }}>
-                  <span style={{ fontSize: 15, fontWeight: 500 }}>Engagement clusters</span>
+                  <span style={{ display: "inline-flex", alignItems: "center", fontSize: 15, fontWeight: 500 }}><TrendIcon />Engagement clusters</span>
                   {velo?.network_integrity != null && <span className="chip">Network integrity {Math.round(velo.network_integrity * 100)}%</span>}
                 </div>
                 <div className="muted" style={{ fontSize: 12, marginBottom: 10 }}>The topics pulling the most engagement right now.</div>
@@ -452,7 +478,7 @@ export default function ProjectDetailPage() {
             {board.length > 0 && (
               <div className="card" style={{ marginBottom: 14 }}>
                 <div className="spread" style={{ marginBottom: 2 }}>
-                  <span style={{ fontSize: 15, fontWeight: 500 }}>Who&apos;s winning attention</span>
+                  <span style={{ display: "inline-flex", alignItems: "center", fontSize: 15, fontWeight: 500 }}><EyeIcon />Who&apos;s winning attention</span>
                   <div className="row" style={{ gap: 4 }}>
                     {(["day", "week", "month"] as const).map((w) => (
                       <button key={w} className={lbWin === w ? "btn btn-primary" : "btn btn-quiet"} style={{ fontSize: 11, padding: "3px 10px" }} onClick={() => setLbWin(w)}>{w === "day" ? "Today" : w === "week" ? "This week" : "This month"}</button>
@@ -493,7 +519,7 @@ export default function ProjectDetailPage() {
               });
               return (
                 <div className="card" style={{ marginBottom: 14 }}>
-                  <div style={{ fontSize: 15, fontWeight: 500, marginBottom: 2 }}>Compare pages</div>
+                  <div style={{ display: "flex", alignItems: "center", fontSize: 15, fontWeight: 500, marginBottom: 2 }}><VelocityIcon />Compare pages</div>
                   <div className="muted" style={{ fontSize: 12, marginBottom: 10 }}>Pick pages to put head-to-head on engagement over time. For a full two-page duel, use the Head-to-head tab.</div>
                   <div className="row" style={{ gap: 6, flexWrap: "wrap", marginBottom: 12 }}>
                     {ana.page_series.slice(0, 12).map((p: any) => {
@@ -594,7 +620,7 @@ export default function ProjectDetailPage() {
             {/* Market scout */}
             <div className="card" style={{ marginBottom: 14 }}>
               <div className="spread" style={{ marginBottom: 4 }}>
-                <span style={{ fontSize: 15, fontWeight: 500 }}>Market scout</span>
+                <span style={{ display: "inline-flex", alignItems: "center", fontSize: 15, fontWeight: 500 }}><EyeIcon />Market scout</span>
                 <button className="btn" disabled={scouting} onClick={scout}>{scouting ? "Scouting…" : "Scout the market"}</button>
               </div>
               <div className="muted" style={{ fontSize: 12, marginBottom: 8 }}>Autonomous: runs daily, auto-adds discovered pages and hashtags to the research pool, budget-guarded. Manual run anytime with the button.</div>
