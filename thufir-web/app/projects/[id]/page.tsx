@@ -446,7 +446,7 @@ export default function ProjectDetailPage() {
               </div>
 
               {/* Row 2 — topic map · clusters · scout */}
-              <div className="ops-row">
+              <div className="ops-stack">
                 <div className="panel" style={{ flex: 40 }}>
                   <div className="panel-head"><TrendIcon />Topic map
                     <span className="ph-right muted" style={{ fontSize: 12, fontFamily: "var(--font)", letterSpacing: 0 }}>What one topic best describes the market?</span>
@@ -516,7 +516,7 @@ export default function ProjectDetailPage() {
               </div>
 
               {/* Row 3 — leaderboard · compare */}
-              <div className="ops-row">
+              <div className="ops-stack">
                 <div className="panel" style={{ flex: 58 }}>
                   <div className="panel-head"><TrendIcon />Who&apos;s winning attention
                     <span className="ph-right"><span className="seg seg-sm">
@@ -604,7 +604,7 @@ export default function ProjectDetailPage() {
               </div>
 
               {/* Row 4 — market talk · top posts · sources */}
-              <div className="ops-row">
+              <div className="ops-stack">
                 <div className="panel" style={{ flex: 34 }}>
                   <div className="panel-head"><VelocityIcon />What the market is talking about</div>
                   <div className="panel-body" style={{ padding: 0 }}>
