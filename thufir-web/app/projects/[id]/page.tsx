@@ -171,6 +171,25 @@ export default function ProjectDetailPage() {
       .then((r) => setFolSeries(r.series || null)).catch(() => setFolSeries(null));
   }, [id, duelA, duelB]);
 
+  async function downloadReport(kind: "page" | "compare") {
+    if (!idValid || !duelA) return;
+    setMsg(null); setError(null);
+    try {
+      const token = getToken();
+      const path = kind === "page"
+        ? `/projects/${id}/report/page?entity_id=${encodeURIComponent(duelA)}`
+        : `/projects/${id}/report/compare?a=${encodeURIComponent(duelA)}&b=${encodeURIComponent(duelB)}`;
+      const res = await fetch(`${API}${path}`, { headers: token ? { Authorization: `Bearer ${token}` } : {} });
+      if (!res.ok) { const d = await res.json().catch(() => ({})); throw new Error(d.detail || "Report failed"); }
+      const blob = await res.blob();
+      const cd = res.headers.get("Content-Disposition") || "";
+      const fname = /filename="([^"]+)"/.exec(cd)?.[1] || `thufir-report-${Date.now()}.pdf`;
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(blob); a.download = fname; a.click();
+      URL.revokeObjectURL(a.href);
+    } catch (e: any) { setError(e.message || "Couldn't generate the report."); }
+  }
+
   async function saveKinds() {
     if (!idValid) return;
     try {
@@ -224,9 +243,10 @@ export default function ProjectDetailPage() {
     if (!window.confirm("This runs a fresh paid Apify scrape. The daily scheduler already collects once a day automatically — only collect manually if you need up-to-the-minute data. Continue?")) return;
     setBusy(true); setError(null); setMsg(null);
     try {
-      const r = await call(`/projects/${id}/sources`, "POST", { urls: urls.split("\n").map((u) => u.trim()).filter((u) => u.startsWith("http")) });
+      const r = await call(`/projects/${id}/sources`, "POST", { urls: urls.split("\n") });
       const note = r?.facebook?.error ? ` (Facebook: ${r.facebook.error})` : "";
-      setMsg(`Collected ${r?.news?.new_items ?? 0} news, ${r?.facebook?.new_items ?? 0} FB posts${note}.`);
+      const src = r?.sources ? ` Sources: ${r.sources.found_in_paste} found, ${r.sources.newly_added} new${r.sources.categorized ? `, ${r.sources.categorized} auto-categorized` : ""}.` : "";
+      setMsg(`Collected ${r?.news?.new_items ?? 0} news, ${r?.facebook?.new_items ?? 0} FB posts${note}.${src}`);
       await analyze();
     } catch (e: any) { setError(e.message || "Collection failed."); }
     finally { setBusy(false); }
@@ -325,6 +345,10 @@ export default function ProjectDetailPage() {
 
               {A && B && (
                 <>
+                  <div className="row" style={{ gap: 10 }}>
+                    <button className="btn" onClick={() => downloadReport("page")}>EXPORT PAGE A REPORT (PDF)</button>
+                    <button className="btn btn-primary" onClick={() => downloadReport("compare")}>EXPORT COMPARISON (PDF)</button>
+                  </div>
                   <div className="ops-row">
                     <div className="panel" style={{ flex: 38 }}>
                       <div className="panel-head"><TrendIcon />Parallel metrics</div>
@@ -757,7 +781,7 @@ export default function ProjectDetailPage() {
                         <button className="btn btn-primary" style={{ marginTop: 10 }} onClick={saveKinds}>Save categories</button>
                       </div>
                     )}
-                    <div className="muted" style={{ fontSize: 11 }}>Paste page URLs or news domains — one per line.</div>
+                    <div className="muted" style={{ fontSize: 11 }}>Paste anything — the app extracts and cleans the links. Organize with headers (MEDIA: / POLITICIANS: / GROUPS: / GOVERNMENT:) and each link below a header is auto-categorized.</div>
                     <textarea className="input" style={{ minHeight: 180, resize: "none", flex: 1 }} value={urls} onChange={(e) => setUrls(e.target.value)} />
                     <button className="btn btn-primary" style={{ width: "100%" }} disabled={busy} onClick={collect}>{busy ? "COLLECTING…" : "Add sources & collect"}</button>
                   </div>
