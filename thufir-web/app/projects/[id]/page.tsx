@@ -236,6 +236,7 @@ export default function ProjectDetailPage() {
     try {
       const r = await call(`/projects/${id}/reprocess`, "POST");
       if (r.error) setError(`Reprocess: ${r.error}`);
+      else if (r.note) setMsg(r.note);
       else setMsg(`Semantic index rebuilt: ${r.posts_reprocessed} posts → ${r.clusters} topics, ${r.clusters_named ?? 0} named (${r.embedding_provider}).`);
       await loadMeta();
     } catch (e: any) { setError(e.message || "Reprocess failed."); }
@@ -284,7 +285,7 @@ export default function ProjectDetailPage() {
   const board = (ana?.leaderboards?.[lbWin] ?? ana?.leaderboard ?? []) as any[];
   const maxEng = Math.max(1, ...board.map((e: any) => e.engagement || 0));
   const allTopics = (velo?.topics ?? []).filter((t: any) => !String(t.label || "").startsWith("(media"));
-  const topClusters = allTopics.slice(0, 8);
+  const topClusters = [...allTopics].sort((x: any, y: any) => (y.engagement || 0) - (x.engagement || 0)).slice(0, 8);
   const maxClusterEng = Math.max(1, ...topClusters.map((t: any) => t.engagement || 0));
   const A = (ana?.duel || []).find((d: any) => d.entity_id === duelA);
   const B = (ana?.duel || []).find((d: any) => d.entity_id === duelB);
