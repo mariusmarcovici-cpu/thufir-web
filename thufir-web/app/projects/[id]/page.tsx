@@ -10,7 +10,7 @@ import { TrendIcon, VelocityIcon, NetworkIcon } from "@/components/BrandAssets";
 
 const API = process.env.NEXT_PUBLIC_API_URL ?? "";
 
-async function call(path: string, method: "GET" | "POST", body?: any) {
+async function call(path: string, method: "GET" | "POST" | "PUT", body?: any) {
   const token = getToken();
   const res = await fetch(`${API}${path}`, {
     method,
@@ -121,6 +121,8 @@ export default function ProjectDetailPage() {
   const [picked, setPicked] = useState<Set<string>>(new Set());
   const [opsEvents, setOpsEvents] = useState<any[]>([]);
   const [folSeries, setFolSeries] = useState<any>(null);
+  const [rosterEdit, setRosterEdit] = useState(false);
+  const [rosterDraft, setRosterDraft] = useState<Set<string>>(new Set());
 
   const analyze = useCallback(async (elena = false) => {
     if (!idValid) return;
@@ -162,6 +164,16 @@ export default function ProjectDetailPage() {
     call(`/projects/${id}/followers?ids=${encodeURIComponent(duelA)}&ids=${encodeURIComponent(duelB)}`, "GET")
       .then((r) => setFolSeries(r.series || null)).catch(() => setFolSeries(null));
   }, [id, duelA, duelB]);
+
+  async function saveRoster() {
+    if (!idValid) return;
+    try {
+      await call(`/projects/${id}/compare-roster`, "PUT", { entity_ids: Array.from(rosterDraft) });
+      setRosterEdit(false);
+      await loadMeta();
+      setMsg("Comparison set saved.");
+    } catch (e: any) { setError(e.message || "Couldn't save the comparison set."); }
+  }
 
   function togglePick(eid: string) {
     setPicked((cur) => { const n = new Set(cur); n.has(eid) ? n.delete(eid) : n.add(eid); return n; });
@@ -558,10 +570,46 @@ export default function ProjectDetailPage() {
                 </div>
 
                 <div className="panel" style={{ flex: 42 }}>
-                  <div className="panel-head"><VelocityIcon />Compare pages</div>
+                  <div className="panel-head"><VelocityIcon />Compare pages
+                    <span className="ph-right">
+                      <button className="btn" style={{ fontSize: 9, padding: "4px 10px" }}
+                        onClick={() => {
+                          const cur = (project?.project?.compare_roster || []) as string[];
+                          setRosterDraft(new Set(cur.length ? cur : (ana.page_series || []).slice(0, 12).map((p: any) => p.entity_id)));
+                          setRosterEdit(!rosterEdit);
+                        }}>
+                        {rosterEdit ? "CLOSE" : "MANAGE"}
+                      </button>
+                    </span>
+                  </div>
                   <div className="panel-body">
+                    {rosterEdit && (
+                      <div style={{ border: "1px solid var(--carbon)", background: "var(--void)", padding: 10, marginBottom: 12 }}>
+                        <div className="stat-label" style={{ marginBottom: 8 }}>Pick the pages this comparison tracks ({rosterDraft.size})</div>
+                        <div className="row" style={{ gap: 6, flexWrap: "wrap", marginBottom: 10 }}>
+                          {(ana.page_series || []).map((p: any) => {
+                            const on = rosterDraft.has(p.entity_id);
+                            return (
+                              <button key={p.entity_id}
+                                onClick={() => setRosterDraft((cur) => { const n = new Set(cur); n.has(p.entity_id) ? n.delete(p.entity_id) : n.add(p.entity_id); return n; })}
+                                style={{ fontFamily: "var(--font-mono)", fontSize: 10, padding: "4px 8px", cursor: "pointer",
+                                  border: `1px solid ${on ? "var(--amber)" : "var(--carbon)"}`, background: on ? "var(--accent-bg)" : "transparent",
+                                  color: on ? "var(--amber)" : "var(--muted)", borderRadius: 0 }}>
+                                {p.page}
+                              </button>
+                            );
+                          })}
+                        </div>
+                        <button className="btn btn-primary" onClick={saveRoster}>Save comparison set</button>
+                      </div>
+                    )}
                     <div className="row" style={{ gap: 6, flexWrap: "wrap", marginBottom: 10 }}>
-                      {(ana.page_series || []).slice(0, 12).map((p: any, idx: number) => {
+                      {(() => {
+                        const roster = (project?.project?.compare_roster || []) as string[];
+                        const all = ana.page_series || [];
+                        const shown = roster.length ? roster.map((rid) => all.find((p: any) => p.entity_id === rid)).filter(Boolean) : all.slice(0, 12);
+                        return shown;
+                      })().map((p: any, idx: number) => {
                         const on = picked.has(p.entity_id);
                         const c = PAGE_COLORS[idx % PAGE_COLORS.length];
                         return (
