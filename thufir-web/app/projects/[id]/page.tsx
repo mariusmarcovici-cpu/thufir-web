@@ -123,12 +123,18 @@ export default function ProjectDetailPage() {
   const [folSeries, setFolSeries] = useState<any>(null);
   const [rosterEdit, setRosterEdit] = useState(false);
   const [rosterDraft, setRosterDraft] = useState<Set<string>>(new Set());
+  const [cat, setCat] = useState<string>("");
+  const [catEdit, setCatEdit] = useState(false);
+  const [kindDraft, setKindDraft] = useState<Record<string, string>>({});
 
-  const analyze = useCallback(async (elena = false) => {
+  const analyze = useCallback(async (elena = false, category = "") => {
     if (!idValid) return;
     setAnalyzing(true); setError(null);
     try {
-      const r = await call(`/projects/${id}/analyze${elena ? "?elena=true" : ""}`, "POST");
+      const q = new URLSearchParams();
+      if (elena) q.set("elena", "true");
+      if (category) q.set("category", category);
+      const r = await call(`/projects/${id}/analyze${q.toString() ? "?" + q.toString() : ""}`, "POST");
       if (r.error) setError(r.error); else setAna(r);
     } catch (e: any) { setError(e.message || "Analysis failed."); }
     finally { setAnalyzing(false); }
@@ -164,6 +170,16 @@ export default function ProjectDetailPage() {
     call(`/projects/${id}/followers?ids=${encodeURIComponent(duelA)}&ids=${encodeURIComponent(duelB)}`, "GET")
       .then((r) => setFolSeries(r.series || null)).catch(() => setFolSeries(null));
   }, [id, duelA, duelB]);
+
+  async function saveKinds() {
+    if (!idValid) return;
+    try {
+      await call(`/projects/${id}/anchor-kinds`, "PUT", { kinds: kindDraft });
+      setCatEdit(false);
+      setMsg("Source categories saved.");
+      await loadMeta();
+    } catch (e: any) { setError(e.message || "Couldn't save categories."); }
+  }
 
   async function saveRoster() {
     if (!idValid) return;
@@ -433,6 +449,21 @@ export default function ProjectDetailPage() {
           {/* ================= DASHBOARD ================= */}
           {view === "dash" && s && (
             <>
+              {/* Category filter */}
+              <div className="row" style={{ gap: 6, flexWrap: "wrap" }}>
+                {[["", "ALL"], ["media", "MEDIA"], ["group", "GROUPS"], ["politician", "POLITICIANS"], ["government", "GOVERNMENT"], ["institution", "INSTITUTIONS"]].map(([v, lbl]) => (
+                  <button key={v} className="seg-chip" data-on={cat === v}
+                    style={{ fontFamily: "var(--font-mono)", fontSize: 10, letterSpacing: 1, padding: "5px 12px", cursor: "pointer", borderRadius: 0,
+                      border: `1px solid ${cat === v ? "var(--amber)" : "var(--carbon)"}`,
+                      background: cat === v ? "var(--accent-bg)" : "transparent",
+                      color: cat === v ? "var(--amber)" : "var(--muted)" }}
+                    onClick={() => { setCat(v); analyze(false, v); }}>
+                    {lbl}
+                  </button>
+                ))}
+                {cat && <span className="muted" style={{ fontSize: 11, alignSelf: "center" }}>— leaderboard, posts &amp; stats filtered to this category; topic map stays market-wide</span>}
+              </div>
+
               {/* Row 1 — summary stats */}
               <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 1, background: "var(--carbon)", border: "1px solid var(--carbon)" }}>
                   <div style={{ background: "var(--console)", padding: "18px 20px" }}>
@@ -694,8 +725,38 @@ export default function ProjectDetailPage() {
                 </div>
 
                 <div className="panel" style={{ flex: 22 }}>
-                  <div className="panel-head"><NetworkIcon />Sources</div>
+                  <div className="panel-head"><NetworkIcon />Sources
+                    <span className="ph-right">
+                      <button className="btn" style={{ fontSize: 9, padding: "4px 10px" }}
+                        onClick={() => {
+                          const d: Record<string, string> = {};
+                          (project?.anchors || []).forEach((a: any) => { d[a.id] = a.kind || "other"; });
+                          setKindDraft(d);
+                          setCatEdit(!catEdit);
+                        }}>
+                        {catEdit ? "CLOSE" : "CATEGORIZE"}
+                      </button>
+                    </span>
+                  </div>
                   <div className="panel-body" style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                    {catEdit && (
+                      <div style={{ border: "1px solid var(--carbon)", background: "var(--void)", padding: 10, maxHeight: 260, overflowY: "auto" }}>
+                        <div className="stat-label" style={{ marginBottom: 8 }}>Assign each source a category</div>
+                        {(project?.anchors || []).map((a: any) => (
+                          <div key={a.id} style={{ display: "flex", alignItems: "center", gap: 8, padding: "4px 0", borderBottom: "1px solid var(--rowline)" }}>
+                            <span style={{ fontFamily: "var(--font-mono)", fontSize: 10, color: "var(--text-2)", flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                              {(a.public_ref || a.label || "").replace("https://www.facebook.com/", "fb/").replace("https://", "")}
+                            </span>
+                            <select className="select" style={{ width: 120, fontSize: 10, padding: "3px 6px" }}
+                              value={kindDraft[a.id] ?? (a.kind || "other")}
+                              onChange={(e) => setKindDraft((cur) => ({ ...cur, [a.id]: e.target.value }))}>
+                              {["media", "group", "politician", "government", "institution", "other"].map((k) => <option key={k} value={k}>{k}</option>)}
+                            </select>
+                          </div>
+                        ))}
+                        <button className="btn btn-primary" style={{ marginTop: 10 }} onClick={saveKinds}>Save categories</button>
+                      </div>
+                    )}
                     <div className="muted" style={{ fontSize: 11 }}>Paste page URLs or news domains — one per line.</div>
                     <textarea className="input" style={{ minHeight: 180, resize: "none", flex: 1 }} value={urls} onChange={(e) => setUrls(e.target.value)} />
                     <button className="btn btn-primary" style={{ width: "100%" }} disabled={busy} onClick={collect}>{busy ? "COLLECTING…" : "Add sources & collect"}</button>
