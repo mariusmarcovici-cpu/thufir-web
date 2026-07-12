@@ -57,9 +57,10 @@ function packBubbles(items: { r: number }[], W: number, H: number) {
   return placed;
 }
 
-function WordBubbles({ topics }: { topics: any[] }) {
+function WordBubbles({ topics, onPick }: { topics: any[]; onPick?: (id: string) => void }) {
   const W = 860, H = 520;
   const items = topics.slice(0, 24).map((t: any) => ({
+    id: t.topic_cluster_id,
     word: String(t.label || "").split(/[\/·]| - /)[0].trim().split(" ").slice(0, 2).join(" ") || "topic",
     full: t.label, n: t.posts || 0, eng: t.engagement || 0,
     mood: t.mood || "neutral", category: t.category,
@@ -71,7 +72,7 @@ function WordBubbles({ topics }: { topics: any[] }) {
   return (
     <svg viewBox={`0 0 ${W} ${H}`} style={{ width: "100%", height: "auto", display: "block" }}>
       {sized.map((b, i) => pos[i].r > 0 && (
-        <g key={i}>
+        <g key={i} onClick={() => b.id && onPick?.(b.id)} style={{ cursor: onPick ? "pointer" : "default" }}>
           <title>{b.full} — {b.n} posts · {b.eng.toLocaleString()} engagement · {b.mood}</title>
           <circle cx={pos[i].x} cy={pos[i].y} r={b.r} fill={BUBBLE_FILL[b.mood] || BUBBLE_FILL.neutral} stroke={BUBBLE_STROKE[b.mood] || BUBBLE_STROKE.neutral} strokeWidth={1.5} />
           <text x={pos[i].x} y={pos[i].y - 3} textAnchor="middle"
@@ -107,11 +108,24 @@ export default function ProjectDetailPage() {
   const [project, setProject] = useState<any>(null);
   const [disc, setDisc] = useState<any>({ topics: [], domains: [], pages: [] });
   const [velo, setVelo] = useState<any>(null);
-  async function loadVelo(category = "") {
+  async function loadVelo(category = "", win?: string) {
     if (!idValid) return;
-    const q = `window=30d${category ? `&category=${category}` : ""}`;
-    const v = await call(`/projects/${id}/velocity/topics?${q}`, "GET").catch(() => null);
+    const w = win ?? topicWin;
+    const q = `window=${w}${category ? `&category=${category}` : ""}`;
+    const v = await call(`/projects/${id}/topics/composed?${q}`, "GET").catch(() => null);
     if (v) setVelo(v);
+    if (v?.note) setMsg(v.note);
+  }
+
+  async function openTopic(clusterId: string) {
+    setTopicDetail({ open: true, loading: true, data: null });
+    try {
+      const d = await call(`/projects/${id}/topics/${clusterId}/posts${cat ? `?category=${cat}` : ""}`, "GET");
+      setTopicDetail({ open: true, loading: false, data: d });
+    } catch (e: any) {
+      setTopicDetail({ open: false, loading: false, data: null });
+      setError(e.message || "Couldn't load the topic's posts.");
+    }
   }
   const [ana, setAna] = useState<any>(null);
   const [analyzing, setAnalyzing] = useState(true);
@@ -127,6 +141,8 @@ export default function ProjectDetailPage() {
   const [picked, setPicked] = useState<Set<string>>(new Set());
   const [opsEvents, setOpsEvents] = useState<any[]>([]);
   const [folSeries, setFolSeries] = useState<any>(null);
+  const [topicWin, setTopicWin] = useState<"day" | "week" | "month" | "all">("month");
+  const [topicDetail, setTopicDetail] = useState<any>({ open: false, loading: false, data: null });
   const [rosterEdit, setRosterEdit] = useState(false);
   const [rosterDraft, setRosterDraft] = useState<Set<string>>(new Set());
   const [cat, setCat] = useState<string>("");
@@ -152,7 +168,7 @@ export default function ProjectDetailPage() {
       const [p, d, v, o] = await Promise.all([
         call(`/projects/${id}`, "GET"),
         call(`/projects/${id}/discovered`, "GET").catch(() => ({ topics: [], domains: [], pages: [] })),
-        call(`/projects/${id}/velocity/topics?window=30d`, "GET").catch(() => null),
+        call(`/projects/${id}/topics/composed?window=month`, "GET").catch(() => null),
         call(`/projects/${id}/ops?limit=5`, "GET").catch(() => ({ events: [] })),
       ]);
       setProject(p);
@@ -498,7 +514,7 @@ export default function ProjectDetailPage() {
                       border: `1px solid ${cat === v ? "var(--amber)" : "var(--carbon)"}`,
                       background: cat === v ? "var(--accent-bg)" : "transparent",
                       color: cat === v ? "var(--amber)" : "var(--muted)" }}
-                    onClick={() => { setCat(v); analyze(false, v); loadVelo(v); }}>
+                    onClick={() => { setCat(v); analyze(false, v); loadVelo(v, topicWin); }}>
                     {lbl}
                   </button>
                 ))}
@@ -533,10 +549,17 @@ export default function ProjectDetailPage() {
               <div className="ops-stack">
                 <div className="panel" style={{ flex: 40 }}>
                   <div className="panel-head"><TrendIcon />Topic map
-                    <span className="ph-right muted" style={{ fontSize: 12, fontFamily: "var(--font)", letterSpacing: 0 }}>What one topic best describes the market?</span>
+                    <span className="ph-right">
+                      <span className="muted" style={{ fontSize: 11, fontFamily: "var(--font)", letterSpacing: 0, marginRight: 8 }}>click a bubble to read its posts</span>
+                      <span className="seg seg-sm">
+                        {(["day", "week", "month", "all"] as const).map((w) => (
+                          <button key={w} data-on={topicWin === w} onClick={() => { setTopicWin(w); loadVelo(cat, w); }}>{w.toUpperCase()}</button>
+                        ))}
+                      </span>
+                    </span>
                   </div>
                   <div className="panel-body" style={{ padding: 8 }}>
-                    {allTopics.length > 2 ? <WordBubbles topics={allTopics} /> : <div className="muted" style={{ fontSize: 12 }}>Run &quot;Rebuild semantic index&quot; to build the map.</div>}
+                    {allTopics.length > 2 ? <WordBubbles topics={allTopics} onPick={openTopic} /> : <div className="muted" style={{ fontSize: 12 }}>Run &quot;Rebuild semantic index&quot; to build the map.</div>}
                   </div>
                   <div style={{ display: "flex", gap: 18, padding: "10px 16px", borderTop: "1px solid var(--carbon)", fontFamily: "var(--font-mono)", fontSize: 10, letterSpacing: 1, color: "var(--muted)" }}>
                     <span><span style={{ display: "inline-block", width: 9, height: 9, background: "#427A5B", marginRight: 6 }} />POSITIVE</span>
@@ -551,7 +574,7 @@ export default function ProjectDetailPage() {
                   </div>
                   <div className="panel-body" style={{ padding: "6px 16px", display: "flex", flexDirection: "column", justifyContent: "space-between" }}>
                     {topClusters.map((t: any) => (
-                      <div key={t.topic_cluster_id} style={{ padding: "9px 0", borderBottom: "1px solid var(--rowline)" }}>
+                      <div key={t.topic_cluster_id} onClick={() => openTopic(t.topic_cluster_id)} style={{ padding: "9px 0", borderBottom: "1px solid var(--rowline)", cursor: "pointer" }}>
                         <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 8, marginBottom: 6 }}>
                           <div style={{ display: "flex", alignItems: "baseline", gap: 8, minWidth: 0 }}>
                             <span style={{ fontSize: 13, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{t.label}</span>
@@ -729,7 +752,7 @@ export default function ProjectDetailPage() {
                   <div className="panel-head"><VelocityIcon />What the market is talking about</div>
                   <div className="panel-body" style={{ padding: 0 }}>
                     {allTopics.slice(0, 12).map((t: any) => (
-                      <div key={t.topic_cluster_id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, padding: "8px 16px", borderBottom: "1px solid var(--rowline)" }}>
+                      <div key={t.topic_cluster_id} onClick={() => openTopic(t.topic_cluster_id)} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, padding: "8px 16px", borderBottom: "1px solid var(--rowline)", cursor: "pointer" }}>
                         <div style={{ minWidth: 0 }}>
                           <div style={{ fontSize: 13, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{t.label}</div>
                           {t.category && <div style={{ ...MONO, fontSize: 10, color: "var(--muted)" }}>{t.category}</div>}
@@ -809,6 +832,58 @@ export default function ProjectDetailPage() {
             </>
           )}
         </div>
+
+        {topicDetail.open && (
+          <div onClick={() => setTopicDetail({ open: false, loading: false, data: null })}
+            style={{ position: "fixed", inset: 0, background: "rgba(13,14,18,0.82)", zIndex: 60, display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }}>
+            <div onClick={(e) => e.stopPropagation()} className="panel" style={{ width: "100%", maxWidth: 760, maxHeight: "82vh", display: "flex", flexDirection: "column" }}>
+              <div className="panel-head">
+                {topicDetail.data?.summary?.label || "TOPIC"}
+                <span className="ph-right">
+                  {cat && <span className="chip chip-accent">{cat.toUpperCase()}</span>}
+                  <button className="btn btn-quiet" style={{ fontSize: 12 }} onClick={() => setTopicDetail({ open: false, loading: false, data: null })}>CLOSE ×</button>
+                </span>
+              </div>
+              <div className="panel-body" style={{ overflowY: "auto" }}>
+                {topicDetail.loading && <div className="muted" style={{ fontSize: 12, fontFamily: "var(--font-mono)" }}>Reading the topic&apos;s posts…</div>}
+                {topicDetail.data?.summary && (
+                  <>
+                    <div className="row" style={{ gap: 14, flexWrap: "wrap", marginBottom: 6 }}>
+                      <span style={{ ...MONO, fontSize: 12 }}>{topicDetail.data.summary.posts} posts</span>
+                      <span style={{ ...MONO, fontSize: 12, color: "var(--amber)" }}>{Number(topicDetail.data.summary.engagement).toLocaleString()} eng</span>
+                      <span style={{ ...MONO, fontSize: 12 }}>{topicDetail.data.summary.pages} pages</span>
+                      {topicDetail.data.summary.mood && <Mood m={topicDetail.data.summary.mood} />}
+                    </div>
+                    {topicDetail.data.summary.top_pages?.length > 0 && (
+                      <div className="row" style={{ gap: 6, flexWrap: "wrap", marginBottom: 10 }}>
+                        {topicDetail.data.summary.top_pages.map((tp: any) => (
+                          <span key={tp.page} className="chip">{tp.page} <span style={{ color: "var(--amber)" }}>·{Number(tp.engagement).toLocaleString()}</span></span>
+                        ))}
+                      </div>
+                    )}
+                    <div style={{ borderTop: "1px solid var(--carbon)" }}>
+                      {topicDetail.data.posts.map((p: any, i: number) => (
+                        <div key={i} style={{ padding: "10px 0", borderBottom: "1px solid var(--rowline)" }}>
+                          <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 5 }}>
+                            <span style={{ fontSize: 13 }}>{p.page}</span>
+                            <span style={{ ...MONO, fontSize: 10, color: "var(--muted)" }}>{p.day.slice(5)}</span>
+                            <span style={{ ...MONO, fontSize: 11, color: "var(--amber)" }}>{p.engagement.toLocaleString()} eng</span>
+                            {p.url && <span style={{ ...MONO, fontSize: 10, marginLeft: "auto" }}><Ext href={p.url}>open ↗</Ext></span>}
+                          </div>
+                          <div style={{ fontSize: 12, lineHeight: 1.5, color: "#B8BEC7" }}>{p.text || <span className="muted">(no text)</span>}</div>
+                          <div style={{ ...MONO, fontSize: 10, color: "var(--muted)", marginTop: 4 }}>{p.reactions.toLocaleString()} reactions · {p.comments.toLocaleString()} comments · {p.shares.toLocaleString()} shares{p.views ? ` · ${p.views.toLocaleString()} views` : ""}</div>
+                        </div>
+                      ))}
+                      {topicDetail.data.posts.length === 0 && !topicDetail.loading && (
+                        <div className="muted" style={{ fontSize: 12, padding: "10px 0" }}>No indexed posts for this topic yet — run one Rebuild to fill the index.</div>
+                      )}
+                    </div>
+                  </>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </>
   );
