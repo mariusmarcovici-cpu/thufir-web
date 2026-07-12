@@ -25,7 +25,7 @@ const moodColor = (m: string) => m === "positive" ? "#8FBFA6" : m === "negative"
 const moodBg = (m: string) => m === "positive" ? "rgba(66,122,91,0.16)" : m === "negative" ? "rgba(158,59,59,0.16)" : "rgba(139,148,158,0.12)";
 const LINE_COLORS = ["#C2A34F", "#4A6B8C", "#427A5B", "#B89340", "#9E3B3B", "#8B949E"];
 const CAT_COLORS: any = { politics: "#4A6B8C", economy: "#427A5B", "crime/safety": "#9E3B3B", "culture/carnival": "#C2A34F", "weather/disaster": "#B89340", sports: "#6E8CA0", community: "#8B949E" };
-const PAGE_COLORS = ["#C2A34F", "#4A6B8C", "#427A5B", "#9E3B3B", "#B89340", "#6E8FB0", "#8B949E", "#A8734F", "#5B8A6E", "#7E6BA8", "#C99A9A", "#9AB0C9"];
+const PAGE_COLORS = ["#C2A34F", "#4A8BC2", "#3FA36B", "#C25248", "#9B6BC9", "#3AA6A0", "#C97E33", "#C462A0", "#9CB03A", "#7B8794", "#6B7FE0", "#B0803A"];
 const PANEL_HEAD: any = { display: "inline-flex", alignItems: "center", fontSize: 11, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.08em", fontFamily: "var(--font-mono)", color: "var(--text-2)" };
 const MONO = { fontFamily: "var(--font-mono)", fontVariantNumeric: "tabular-nums" } as const;
 const TOOLTIP_STYLE = { contentStyle: { background: "#0D0E12", border: "1px solid #C2A34F", borderRadius: 2, fontFamily: "var(--font-mono)", fontSize: 11, color: "#E4E7EB" }, labelStyle: { color: "#8B949E", fontFamily: "var(--font-mono)" }, itemStyle: { color: "#E4E7EB" } } as const;
@@ -217,8 +217,11 @@ export default function ProjectDetailPage() {
     if (!confirm(`Remove this source?\n\n${label}\n\nAlready-collected posts stay in the corpus; the page just won't be scraped again.`)) return;
     try {
       await call(`/projects/${id}/anchor/${anchorId}`, "DELETE");
-      setMsg("Source removed.");
+      setPicked((cur) => { const n = new Set(cur); n.forEach((x) => x); return n; });
+      setMsg("Source removed and blocked — it won't come back, and its data is leaving the views.");
       await loadMeta();
+      analyze(false, cat);
+      loadVelo(cat);
     } catch (e: any) { setError(e.message || "Couldn't remove the source."); }
   }
 
@@ -236,6 +239,7 @@ export default function ProjectDetailPage() {
     if (!idValid) return;
     try {
       await call(`/projects/${id}/compare-roster`, "PUT", { entity_ids: Array.from(rosterDraft) });
+      setPicked((cur) => new Set(Array.from(cur).filter((eid) => rosterDraft.has(eid))));
       setRosterEdit(false);
       await loadMeta();
       setMsg("Comparison set saved.");
@@ -718,7 +722,9 @@ export default function ProjectDetailPage() {
                     </div>
                     <div style={{ fontFamily: "var(--font-mono)", fontSize: 9, letterSpacing: 1.5, textTransform: "uppercase" as any, color: "var(--muted)", marginBottom: 6 }}>Daily engagement · by day</div>
                     {(() => {
-                      const chosen = (ana.page_series || []).filter((p: any) => picked.has(p.entity_id));
+                      const roster = (project?.project?.compare_roster || []) as string[];
+                      const shownIds = new Set((roster.length ? roster : (ana.page_series || []).slice(0, 12).map((p: any) => p.entity_id)));
+                      const chosen = (ana.page_series || []).filter((p: any) => picked.has(p.entity_id) && shownIds.has(p.entity_id));
                       const days = Array.from(new Set(chosen.flatMap((p: any) => p.series.map((x: any) => x.day)))).sort() as string[];
                       const data = days.map((day) => {
                         const row: any = { day };
