@@ -16,7 +16,7 @@ export function clearToken() {
   window.localStorage.removeItem(TOKEN_KEY);
 }
 
-class ApiError extends Error {
+export class ApiError extends Error {
   status: number;
   constructor(status: number, message: string) {
     super(message);
@@ -81,6 +81,20 @@ export const api = {
   // ---- data (used by the dashboard screens, added next) ----
   topicVelocity: (projectId: string, window = "24h") =>
     request<any>(`/projects/${projectId}/velocity/topics?window=${window}`),
+  // ---- access / members ----
+  invite: (projectId: string, email: string, role: "editor" | "viewer") =>
+    request<{ invite_token: string; expires_at: string }>(`/auth/projects/${projectId}/invite`, {
+      method: "POST", body: JSON.stringify({ email, role }),
+    }),
+  members: (projectId: string) =>
+    request<any>(`/auth/projects/${projectId}/members`),
+  inviteInfo: (token: string) =>
+    request<any>(`/auth/invite-info?token=${encodeURIComponent(token)}`),
+  acceptInvite: (token: string) =>
+    request<{ project_id: string; role: string }>(`/auth/accept-invite?token=${encodeURIComponent(token)}`, {
+      method: "POST",
+    }),
+
   compareEntities: (projectId: string, ids: string[], grain = "7 days") =>
     request<any>(
       `/projects/${projectId}/entities/compare?grain=${encodeURIComponent(grain)}&` +
@@ -88,4 +102,3 @@ export const api = {
     ),
 };
 
-export { ApiError };
