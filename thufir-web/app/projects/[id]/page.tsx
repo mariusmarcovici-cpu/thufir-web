@@ -141,7 +141,7 @@ export default function ProjectDetailPage() {
   const [picked, setPicked] = useState<Set<string>>(new Set());
   const [opsEvents, setOpsEvents] = useState<any[]>([]);
   const [folSeries, setFolSeries] = useState<any>(null);
-  const [topicWin, setTopicWin] = useState<"day" | "week" | "month" | "all">("month");
+  const [topicWin, setTopicWin] = useState<"day" | "week" | "month">("month");
   const [topicDetail, setTopicDetail] = useState<any>({ open: false, loading: false, data: null });
   const [rosterEdit, setRosterEdit] = useState(false);
   const [rosterDraft, setRosterDraft] = useState<Set<string>>(new Set());
@@ -552,7 +552,7 @@ export default function ProjectDetailPage() {
                     <span className="ph-right">
                       <span className="muted" style={{ fontSize: 11, fontFamily: "var(--font)", letterSpacing: 0, marginRight: 8 }}>click a bubble to read its posts</span>
                       <span className="seg seg-sm">
-                        {(["day", "week", "month", "all"] as const).map((w) => (
+                        {(["day", "week", "month"] as const).map((w) => (
                           <button key={w} data-on={topicWin === w} onClick={() => { setTopicWin(w); loadVelo(cat, w); }}>{w.toUpperCase()}</button>
                         ))}
                       </span>
