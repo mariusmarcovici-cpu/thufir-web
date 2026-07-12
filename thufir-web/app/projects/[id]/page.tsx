@@ -629,7 +629,7 @@ export default function ProjectDetailPage() {
                         <div className="muted" style={{ fontSize: 11, marginBottom: 5, letterSpacing: ".04em" }}>SCOUT PROPOSES — pages mentioned often enough to matter. Nothing joins the roster without your word.</div>
                         {(disc.pages || []).slice(0, 6).map((p: any) => (
                           <div key={p.ref} style={{ display: "flex", alignItems: "center", gap: 8, padding: "6px 0", borderBottom: "1px solid var(--rowline)" }}>
-                            <span style={{ fontSize: 12, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flex: 1 }}>{String(p.ref).replace("https://www.facebook.com/", "").replace("https://facebook.com/", "")}</span>
+                            <span style={{ fontSize: 12, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flex: 1 }}><Ext href={p.ref}>{String(p.ref).replace("https://www.facebook.com/", "").replace("https://facebook.com/", "")} ↗</Ext></span>
                             <span style={{ ...MONO, fontSize: 10, color: "var(--amber)" }}>·{p.co_count}</span>
                             <button className="btn btn-quiet" style={{ fontSize: 10, padding: "2px 8px" }} onClick={() => scoutDecide(p.ref, "approve")}>APPROVE</button>
                             <button style={{ border: "1px solid var(--carbon)", background: "transparent", color: "var(--danger)", cursor: "pointer", fontSize: 10, padding: "2px 8px", borderRadius: 0 }} onClick={() => scoutDecide(p.ref, "reject")}>REJECT</button>
