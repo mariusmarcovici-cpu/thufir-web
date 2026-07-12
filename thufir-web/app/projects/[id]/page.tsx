@@ -133,6 +133,7 @@ export default function ProjectDetailPage() {
   const [reproc, setReproc] = useState(false);
   const [busy, setBusy] = useState(false);
   const [lbWin, setLbWin] = useState<"day" | "week" | "month">("week");
+  const [tpWin, setTpWin] = useState<"day" | "week" | "month">("week");
   const [duelA, setDuelA] = useState<string>("");
   const [duelB, setDuelB] = useState<string>("");
   const [urls, setUrls] = useState("https://stluciatimes.com/feed/\n");
@@ -330,6 +331,15 @@ export default function ProjectDetailPage() {
   const s = ana?.summary;
   const pulse = ana?.pulse;
   const board = (ana?.leaderboards?.[lbWin] ?? ana?.leaderboard ?? []) as any[];
+  const topPostsWindowed = (() => {
+    const posts = ((ana?.top_posts || []) as any[]).filter((p) => !p.dateless);
+    const days = posts.map((p) => p.day).filter(Boolean).sort();
+    if (!days.length) return posts;
+    const anchor = new Date(days[days.length - 1] + "T00:00:00Z");
+    const span = tpWin === "day" ? 1 : tpWin === "week" ? 7 : 30;
+    const cutoff = new Date(anchor.getTime() - (span - 1) * 86400000).toISOString().slice(0, 10);
+    return posts.filter((p) => p.day >= cutoff);
+  })();
   const maxEng = Math.max(1, ...board.map((e: any) => e.engagement || 0));
   const allTopics = (velo?.topics ?? []).filter((t: any) => !String(t.label || "").startsWith("(media"));
   const topClusters = [...allTopics].sort((x: any, y: any) => (y.engagement || 0) - (x.engagement || 0)).slice(0, 8);
@@ -692,10 +702,15 @@ export default function ProjectDetailPage() {
                             <span style={{ fontSize: 13 }}><Ext href={e.page_url}>{e.page || e.display_name}</Ext></span>
                             <Mood m={e.mood} />
                           </div>
-                          <div style={{ ...MONO, fontSize: 10, color: "var(--muted)" }}>{e.likes.toLocaleString()} reactions · {e.shares.toLocaleString()} shares · {e.views.toLocaleString()} views</div>
+                          <div style={{ ...MONO, fontSize: 10, color: "var(--muted)" }}>
+                            <span style={{ color: "var(--text-2)" }}>PAGE TOTAL, {lbWin === "day" ? "TODAY" : lbWin === "week" ? "THIS WEEK" : "THIS MONTH"}</span>
+                            {" · "}{e.posts ?? 0} post{(e.posts ?? 0) === 1 ? "" : "s"}
+                            {" · "}{e.likes.toLocaleString()} reactions · {e.shares.toLocaleString()} shares · {e.views.toLocaleString()} views
+                          </div>
                           {e.best_post && (
-                            <div style={{ display: "flex", alignItems: "baseline", gap: 8, marginTop: 6 }}>
-                              <span style={{ ...MONO, fontSize: 10, color: "var(--muted)", maxWidth: 340, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>&quot;{e.best_post.text || "(no text)"}&quot;</span>
+                            <div style={{ display: "flex", alignItems: "baseline", gap: 8, marginTop: 6, paddingTop: 6, borderTop: "1px dashed var(--rowline)" }}>
+                              <span style={{ ...MONO, fontSize: 9, color: "var(--muted)", letterSpacing: ".06em", flexShrink: 0 }}>TOP POST</span>
+                              <span style={{ ...MONO, fontSize: 10, color: "var(--muted)", maxWidth: 300, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>&quot;{e.best_post.text || "(no text)"}&quot;</span>
                               <span style={{ ...MONO, fontSize: 10, color: "var(--amber)" }}>{e.best_post.engagement.toLocaleString()}</span>
                               <span style={{ ...MONO, fontSize: 10 }}><Ext href={e.best_post.url}>open</Ext></span>
                             </div>
@@ -824,9 +839,17 @@ export default function ProjectDetailPage() {
                 </div>
 
                 <div className="panel" style={{ flex: 44 }}>
-                  <div className="panel-head"><TrendIcon />Top posts by engagement</div>
+                  <div className="panel-head"><TrendIcon />Top posts by engagement
+                    <span className="ph-right">
+                      <span className="seg seg-sm">
+                        {(["day", "week", "month"] as const).map((w) => (
+                          <button key={w} data-on={tpWin === w} onClick={() => setTpWin(w)}>{w === "day" ? "TODAY" : w === "week" ? "THIS WEEK" : "THIS MONTH"}</button>
+                        ))}
+                      </span>
+                    </span>
+                  </div>
                   <div className="panel-body" style={{ padding: 0 }}>
-                    {(ana.top_posts || []).slice(0, 5).map((p: any, i: number) => (
+                    {topPostsWindowed.slice(0, 5).map((p: any, i: number) => (
                       <div key={i} style={{ padding: "12px 16px", borderBottom: "1px solid var(--rowline)" }}>
                         <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 7 }}>
                           <span style={{ fontSize: 13 }}>{p.page}</span>
@@ -889,10 +912,7 @@ export default function ProjectDetailPage() {
                       try {
                         const r = await call(`/projects/${id}/scan-pages`, "POST");
                         if (r.error) setError(`Page scan: ${r.error}`);
-                        else setMsg(`Page scan: ${r.profiles ?? 0} profiles read, ${r.snapshots ?? 0} follower snapshots, ${r.auto_categorized ?? 0} auto-categorized, ${r.proposals_enriched ?? 0} proposals enriched.`);
-                        await loadMeta();
-                        const d = await call(`/projects/${id}/discovered`, "GET").catch(() => null);
-                        if (d) setDisc(d);
+                        else setMsg(r.note || "Page scan started — the result lands in the ops feed in a few minutes.");
                       } catch (e: any) { setError(e.message || "Page scan failed."); }
                       finally { setBusy(false); }
                     }}>SCAN PAGES (profiles · followers · categories)</button>
