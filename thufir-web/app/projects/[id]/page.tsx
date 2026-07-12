@@ -225,6 +225,20 @@ export default function ProjectDetailPage() {
     } catch (e: any) { setError(e.message || "Couldn't remove the source."); }
   }
 
+  async function scoutDecide(ref: string, action: "approve" | "reject") {
+    if (!idValid) return;
+    try {
+      await call(`/projects/${id}/scout/${action}`, "POST", { ref });
+      setMsg(action === "approve"
+        ? "Source approved — it joins the roster and will be scraped from the next collect."
+        : "Rejected and blocked — the scout will never propose it again, and its data is leaving the views.");
+      const d = await call(`/projects/${id}/discovered`, "GET").catch(() => null);
+      if (d) setDisc(d);
+      await loadMeta();
+      if (action === "reject") { analyze(false, cat); loadVelo(cat); }
+    } catch (e: any) { setError(e.message || "Couldn't record the decision."); }
+  }
+
   async function saveKinds() {
     if (!idValid) return;
     try {
@@ -610,6 +624,19 @@ export default function ProjectDetailPage() {
                         </div>
                       </div>
                     )}
+                    {(disc.pages || []).length > 0 && (
+                      <div style={{ marginBottom: 10 }}>
+                        <div className="muted" style={{ fontSize: 11, marginBottom: 5, letterSpacing: ".04em" }}>SCOUT PROPOSES — pages mentioned often enough to matter. Nothing joins the roster without your word.</div>
+                        {(disc.pages || []).slice(0, 6).map((p: any) => (
+                          <div key={p.ref} style={{ display: "flex", alignItems: "center", gap: 8, padding: "6px 0", borderBottom: "1px solid var(--rowline)" }}>
+                            <span style={{ fontSize: 12, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flex: 1 }}>{String(p.ref).replace("https://www.facebook.com/", "").replace("https://facebook.com/", "")}</span>
+                            <span style={{ ...MONO, fontSize: 10, color: "var(--amber)" }}>·{p.co_count}</span>
+                            <button className="btn btn-quiet" style={{ fontSize: 10, padding: "2px 8px" }} onClick={() => scoutDecide(p.ref, "approve")}>APPROVE</button>
+                            <button style={{ border: "1px solid var(--carbon)", background: "transparent", color: "var(--danger)", cursor: "pointer", fontSize: 10, padding: "2px 8px", borderRadius: 0 }} onClick={() => scoutDecide(p.ref, "reject")}>REJECT</button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
                     {disc.topics.length > 0 && (
                       <div>
                         <div className="stat-label">Hashtags</div>
@@ -708,9 +735,9 @@ export default function ProjectDetailPage() {
                         const all = ana.page_series || [];
                         const shown = roster.length ? roster.map((rid) => all.find((p: any) => p.entity_id === rid)).filter(Boolean) : all.slice(0, 12);
                         return shown;
-                      })().map((p: any, idx: number) => {
+                      })().map((p: any) => {
                         const on = picked.has(p.entity_id);
-                        const c = PAGE_COLORS[idx % PAGE_COLORS.length];
+                        const c = pageColor(p.entity_id);
                         return (
                           <button key={p.entity_id} onClick={() => togglePick(p.entity_id)}
                             style={{ fontFamily: "var(--font-mono)", fontSize: 10, padding: "4px 8px", cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 6,
