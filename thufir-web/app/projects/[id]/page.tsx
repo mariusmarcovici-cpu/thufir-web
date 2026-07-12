@@ -106,6 +106,21 @@ export default function ProjectDetailPage() {
 
   const [view, setView] = useState<"dash" | "duel">("dash");
   const [project, setProject] = useState<any>(null);
+  const isAdmin = ["owner", "editor"].includes(project?.role || "");
+  const [coord, setCoord] = useState<any>(null);
+  async function loadCoord() {
+    if (!idValid) return;
+    const c = await call(`/projects/${id}/coordination`, "GET").catch(() => null);
+    if (c) setCoord(c);
+  }
+  async function runCoord() {
+    if (!idValid) return;
+    setError(null); setMsg(null);
+    try {
+      const r = await call(`/projects/${id}/coordination/run`, "POST");
+      setMsg(r.note || "Coordination pass started — result lands in the ops feed.");
+    } catch (e: any) { setError(e.message || "Couldn't start the coordination pass."); }
+  }
   const [disc, setDisc] = useState<any>({ topics: [], domains: [], pages: [] });
   const [velo, setVelo] = useState<any>(null);
   async function loadVelo(category = "", win?: string) {
@@ -173,6 +188,7 @@ export default function ProjectDetailPage() {
         call(`/projects/${id}/ops?limit=5`, "GET").catch(() => ({ events: [] })),
       ]);
       setProject(p);
+      loadCoord();
       setDisc({ topics: d.topics || [], domains: d.domains || [], pages: d.pages || [] });
       setVelo(v);
       setOpsEvents(o.events || []);
@@ -378,7 +394,7 @@ export default function ProjectDetailPage() {
               </div>
               <button className="btn btn-primary" disabled={analyzing} onClick={() => analyze(false)}>{analyzing ? "ANALYSING…" : "Re-analyse"}</button>
               <button className="btn" disabled={analyzing} onClick={() => analyze(true)}>Deep tone (Elena)</button>
-              <button className="btn" disabled={reproc} onClick={rebuildIndex}>{reproc ? "Rebuilding…" : "Rebuild semantic index"}</button>
+              {isAdmin && (<button className="btn" disabled={reproc} onClick={rebuildIndex}>{reproc ? "Rebuilding…" : "Rebuild semantic index"}</button>)}
             </div>
           </div>
         )}
@@ -639,7 +655,7 @@ export default function ProjectDetailPage() {
                 <div className="panel" style={{ flex: 27 }}>
                   <div className="panel-head"><NetworkIcon />Market scout</div>
                   <div className="panel-body" style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-                    <button className="btn btn-primary" style={{ width: "100%" }} disabled={scouting} onClick={scout}>{scouting ? "SCOUTING…" : "Scout the market"}</button>
+                    {isAdmin && (<button className="btn btn-primary" style={{ width: "100%" }} disabled={scouting} onClick={scout}>{scouting ? "SCOUTING…" : "Scout the market"}</button>)}
                     <div className="muted" style={{ fontSize: 11 }}>Runs daily · auto-adds pages &amp; hashtags · budget-guarded.</div>
                     {opsEvents.length > 0 && (
                       <div>
@@ -661,8 +677,8 @@ export default function ProjectDetailPage() {
                             {p.locality === 1 && <span style={{ ...MONO, fontSize: 9, color: "var(--green, #3FA36B)", flexShrink: 0 }}>ST. LUCIA</span>}
                             {p.locality === 3 && <span style={{ ...MONO, fontSize: 9, color: "var(--danger)", flexShrink: 0 }} title={p.service_area || ""}>ELSEWHERE</span>}
                             {p.category && <span className="muted" style={{ ...MONO, fontSize: 9, flexShrink: 0 }}>{p.category}</span>}
-                            <button className="btn btn-quiet" style={{ fontSize: 10, padding: "2px 8px" }} onClick={() => scoutDecide(p.ref, "approve")}>APPROVE</button>
-                            <button style={{ border: "1px solid var(--carbon)", background: "transparent", color: "var(--danger)", cursor: "pointer", fontSize: 10, padding: "2px 8px", borderRadius: 0 }} onClick={() => scoutDecide(p.ref, "reject")}>REJECT</button>
+{isAdmin && (<>                            <button className="btn btn-quiet" style={{ fontSize: 10, padding: "2px 8px" }} onClick={() => scoutDecide(p.ref, "approve")}>APPROVE</button>
+                            <button style={{ border: "1px solid var(--carbon)", background: "transparent", color: "var(--danger)", cursor: "pointer", fontSize: 10, padding: "2px 8px", borderRadius: 0 }} onClick={() => scoutDecide(p.ref, "reject")}>REJECT</button></>)}
                           </div>
                         ))}
                       </div>
@@ -897,8 +913,8 @@ export default function ProjectDetailPage() {
                               onChange={(e) => setKindDraft((cur) => ({ ...cur, [a.id]: e.target.value }))}>
                               {["media", "group", "politician", "government", "institution", "other"].map((k) => <option key={k} value={k}>{k}</option>)}
                             </select>
-                            <button title="Remove this source" onClick={() => deleteSource(a.id, a.public_ref || a.label)}
-                              style={{ border: "1px solid var(--carbon)", background: "transparent", color: "var(--danger)", cursor: "pointer", fontSize: 11, padding: "2px 7px", borderRadius: 0, flexShrink: 0 }}>×</button>
+                            {isAdmin && <button title="Remove this source" onClick={() => deleteSource(a.id, a.public_ref || a.label)}
+                              style={{ border: "1px solid var(--carbon)", background: "transparent", color: "var(--danger)", cursor: "pointer", fontSize: 11, padding: "2px 7px", borderRadius: 0, flexShrink: 0 }}>×</button>}
                           </div>
                         ))}
                         <button className="btn btn-primary" style={{ marginTop: 10 }} onClick={saveKinds}>Save categories</button>
@@ -906,7 +922,8 @@ export default function ProjectDetailPage() {
                     )}
                     <div className="muted" style={{ fontSize: 11 }}>Paste anything — the app extracts and cleans the links. Organize with headers (MEDIA: / POLITICIANS: / GROUPS: / GOVERNMENT:) and each link below a header is auto-categorized.</div>
                     <textarea className="input" style={{ minHeight: 180, resize: "none", flex: 1 }} value={urls} onChange={(e) => setUrls(e.target.value)} />
-                    <button className="btn btn-primary" style={{ width: "100%" }} disabled={busy} onClick={collect}>{busy ? "COLLECTING…" : "Add sources & collect"}</button>
+                    {isAdmin && (<button className="btn btn-primary" style={{ width: "100%" }} disabled={busy} onClick={collect}>{busy ? "COLLECTING…" : "Add sources & collect"}</button>)}
+{isAdmin && (
                     <button className="btn btn-quiet" style={{ width: "100%", marginTop: 6 }} disabled={busy} onClick={async () => {
                       setBusy(true); setError(null); setMsg(null);
                       try {
@@ -915,12 +932,65 @@ export default function ProjectDetailPage() {
                         else setMsg(r.note || "Page scan started — the result lands in the ops feed in a few minutes.");
                       } catch (e: any) { setError(e.message || "Page scan failed."); }
                       finally { setBusy(false); }
-                    }}>SCAN PAGES (profiles · followers · categories)</button>
+                    }}>SCAN PAGES (profiles · followers · categories)</button>)}
                   </div>
                 </div>
               </div>
             </>
           )}
+        </div>
+
+        <div className="panel" style={{ marginTop: 14 }}>
+          <div className="panel-head"><NetworkIcon />Coordination
+            <span className="ph-right">
+              <span className="muted" style={{ fontSize: 10, fontFamily: "var(--font)", letterSpacing: 0, marginRight: 8 }}>
+                similar residual text across different pages in a tight time bracket — a signal to investigate, not a verdict
+              </span>
+              {isAdmin && <button className="btn btn-quiet" style={{ fontSize: 11 }} onClick={runCoord}>RUN PASS</button>}
+            </span>
+          </div>
+          <div className="panel-body">
+            {!coord && <div className="muted" style={{ fontSize: 12, fontFamily: "var(--font-mono)" }}>No coordination pass yet{isAdmin ? " — click RUN PASS." : "."}</div>}
+            {coord && (coord.events?.length || 0) === 0 && (coord.edges?.length || 0) === 0 && (
+              <div className="muted" style={{ fontSize: 12, fontFamily: "var(--font-mono)" }}>No coordination signatures found in the current corpus.</div>
+            )}
+            {coord && (coord.events?.length || 0) > 0 && (
+              <div style={{ marginBottom: 12 }}>
+                <div className="muted" style={{ fontSize: 11, marginBottom: 6, letterSpacing: ".04em" }}>SYNCHRONIZED POSTING EVENTS — {coord.events.length}</div>
+                {coord.events.map((ev: any, i: number) => (
+                  <div key={i} style={{ padding: "9px 0", borderBottom: "1px solid var(--rowline)" }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4, flexWrap: "wrap" }}>
+                      <span style={{ ...MONO, fontSize: 11, color: "var(--danger)" }}>{ev.entity_count} pages</span>
+                      <span style={{ ...MONO, fontSize: 10, color: "var(--muted)" }}>{ev.post_count} posts in {Math.round((new Date(ev.window_end).getTime() - new Date(ev.window_start).getTime()) / 60000)} min</span>
+                      <span style={{ ...MONO, fontSize: 10, color: "var(--muted)" }}>{new Date(ev.window_start).toLocaleString()}</span>
+                    </div>
+                    <div style={{ display: "flex", gap: 5, flexWrap: "wrap", marginBottom: 4 }}>
+                      {(ev.entities || []).map((e: string) => <span key={e} className="chip" style={{ fontSize: 10 }}>{e.replace("fb:", "")}</span>)}
+                    </div>
+                    <div style={{ fontSize: 12, color: "#B8BEC7", fontStyle: "italic" }}>&ldquo;{ev.sample_text}&rdquo;</div>
+                  </div>
+                ))}
+              </div>
+            )}
+            {coord && (coord.edges?.length || 0) > 0 && (
+              <div>
+                <div className="muted" style={{ fontSize: 11, marginBottom: 6, letterSpacing: ".04em" }}>
+                  SIMILARITY LADDER — top pairs across different pages (flag threshold {coord.threshold})
+                </div>
+                {coord.edges.slice(0, 12).map((e: any, i: number) => (
+                  <div key={i} style={{ display: "flex", alignItems: "center", gap: 8, padding: "6px 0", borderBottom: "1px solid var(--rowline)" }}>
+                    <span style={{ ...MONO, fontSize: 12, color: e.flagged ? "var(--danger)" : "var(--muted)", width: 46 }}>{e.similarity.toFixed(3)}</span>
+                    <span style={{ ...MONO, fontSize: 10, flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                      {e.entity_a.replace("fb:", "")} ↔ {e.entity_b.replace("fb:", "")}
+                    </span>
+                    <span style={{ ...MONO, fontSize: 9, color: "var(--muted)" }}>{e.time_delta_seconds < 3600 ? `${Math.round(e.time_delta_seconds / 60)}m` : `${Math.round(e.time_delta_seconds / 3600)}h`} apart</span>
+                    {e.url_a && <span style={{ ...MONO, fontSize: 9 }}><Ext href={e.url_a}>a</Ext></span>}
+                    {e.url_b && <span style={{ ...MONO, fontSize: 9 }}><Ext href={e.url_b}>b</Ext></span>}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
 
         {topicDetail.open && (
