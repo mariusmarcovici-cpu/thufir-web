@@ -225,6 +225,19 @@ export default function ProjectDetailPage() {
     } catch (e: any) { setError(e.message || "Couldn't remove the source."); }
   }
 
+  function eidOf(ref: string): string {
+    const m = String(ref || "").match(/facebook\.com\/([^/?#]+)/);
+    return ("fb:" + (m ? m[1].toLowerCase() : "unknown")).slice(0, 32);
+  }
+  const anchorByEid: Record<string, any> = {};
+  (project?.anchors || []).forEach((a: any) => { if (a.public_ref) anchorByEid[eidOf(a.public_ref)] = a; });
+  const followerLine = (eid: string) => {
+    const a = anchorByEid[eid];
+    if (!a || !a.followers) return null;
+    const d = Number(a.followers_delta || 0);
+    return `${Number(a.followers).toLocaleString()} followers${d ? ` (${d > 0 ? "▲" : "▼"}${Math.abs(d).toLocaleString()}/wk)` : ""}`;
+  };
+
   async function scoutDecide(ref: string, action: "approve" | "reject") {
     if (!idValid) return;
     try {
@@ -378,6 +391,7 @@ export default function ProjectDetailPage() {
                         {ana.duel.map((d: any) => <option key={d.entity_id} value={d.entity_id}>{d.page}</option>)}
                       </select>
                     </div>
+                    {followerLine(duelA) && <div className="muted" style={{ ...MONO, fontSize: 10, marginTop: 4 }}>{followerLine(duelA)}</div>}
                   </div>
                 </div>
                 <div style={{ fontFamily: "var(--font-mono)", fontSize: 12, letterSpacing: 2, color: "var(--muted)", padding: "0 4px" }}>VS</div>
@@ -389,6 +403,9 @@ export default function ProjectDetailPage() {
                       <select className="select" style={{ fontSize: 14, fontWeight: 600, fontFamily: "var(--font)", border: "none", padding: 0, background: "transparent" }} value={duelB} onChange={(e) => setDuelB(e.target.value)}>
                         {ana.duel.map((d: any) => <option key={d.entity_id} value={d.entity_id}>{d.page}</option>)}
                       </select>
+                    </div>
+                    {followerLine(duelB) && <div className="muted" style={{ ...MONO, fontSize: 10, marginTop: 4 }}>{followerLine(duelB)}</div>}
+                    <div style={{ display: "none" }}>
                     </div>
                   </div>
                 </div>
@@ -631,6 +648,9 @@ export default function ProjectDetailPage() {
                           <div key={p.ref} style={{ display: "flex", alignItems: "center", gap: 8, padding: "6px 0", borderBottom: "1px solid var(--rowline)" }}>
                             <span style={{ fontSize: 12, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flex: 1 }}><Ext href={p.ref}>{String(p.ref).replace("https://www.facebook.com/", "").replace("https://facebook.com/", "")} ↗</Ext></span>
                             <span style={{ ...MONO, fontSize: 10, color: "var(--amber)" }}>·{p.co_count}</span>
+                            {p.locality === 1 && <span style={{ ...MONO, fontSize: 9, color: "var(--green, #3FA36B)", flexShrink: 0 }}>ST. LUCIA</span>}
+                            {p.locality === 3 && <span style={{ ...MONO, fontSize: 9, color: "var(--danger)", flexShrink: 0 }} title={p.service_area || ""}>ELSEWHERE</span>}
+                            {p.category && <span className="muted" style={{ ...MONO, fontSize: 9, flexShrink: 0 }}>{p.category}</span>}
                             <button className="btn btn-quiet" style={{ fontSize: 10, padding: "2px 8px" }} onClick={() => scoutDecide(p.ref, "approve")}>APPROVE</button>
                             <button style={{ border: "1px solid var(--carbon)", background: "transparent", color: "var(--danger)", cursor: "pointer", fontSize: 10, padding: "2px 8px", borderRadius: 0 }} onClick={() => scoutDecide(p.ref, "reject")}>REJECT</button>
                           </div>
@@ -844,6 +864,11 @@ export default function ProjectDetailPage() {
                             <span style={{ fontFamily: "var(--font-mono)", fontSize: 10, color: "var(--text-2)", flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                               {(a.public_ref || a.label || "").replace("https://www.facebook.com/", "fb/").replace("https://", "")}
                             </span>
+                            {(a.page_category || a.service_area) && (
+                              <span className="muted" style={{ ...MONO, fontSize: 9, flexShrink: 0, maxWidth: 150, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={`${a.page_category || ""}${a.service_area ? " · " + a.service_area : ""}`}>
+                                {a.page_category || "?"}{a.service_area ? ` · ${a.service_area}` : ""}
+                              </span>
+                            )}
                             <select className="select" style={{ width: 110, fontSize: 10, padding: "3px 6px" }}
                               value={kindDraft[a.id] ?? (a.kind || "other")}
                               onChange={(e) => setKindDraft((cur) => ({ ...cur, [a.id]: e.target.value }))}>
@@ -859,6 +884,18 @@ export default function ProjectDetailPage() {
                     <div className="muted" style={{ fontSize: 11 }}>Paste anything — the app extracts and cleans the links. Organize with headers (MEDIA: / POLITICIANS: / GROUPS: / GOVERNMENT:) and each link below a header is auto-categorized.</div>
                     <textarea className="input" style={{ minHeight: 180, resize: "none", flex: 1 }} value={urls} onChange={(e) => setUrls(e.target.value)} />
                     <button className="btn btn-primary" style={{ width: "100%" }} disabled={busy} onClick={collect}>{busy ? "COLLECTING…" : "Add sources & collect"}</button>
+                    <button className="btn btn-quiet" style={{ width: "100%", marginTop: 6 }} disabled={busy} onClick={async () => {
+                      setBusy(true); setError(null); setMsg(null);
+                      try {
+                        const r = await call(`/projects/${id}/scan-pages`, "POST");
+                        if (r.error) setError(`Page scan: ${r.error}`);
+                        else setMsg(`Page scan: ${r.profiles ?? 0} profiles read, ${r.snapshots ?? 0} follower snapshots, ${r.auto_categorized ?? 0} auto-categorized, ${r.proposals_enriched ?? 0} proposals enriched.`);
+                        await loadMeta();
+                        const d = await call(`/projects/${id}/discovered`, "GET").catch(() => null);
+                        if (d) setDisc(d);
+                      } catch (e: any) { setError(e.message || "Page scan failed."); }
+                      finally { setBusy(false); }
+                    }}>SCAN PAGES (profiles · followers · categories)</button>
                   </div>
                 </div>
               </div>
