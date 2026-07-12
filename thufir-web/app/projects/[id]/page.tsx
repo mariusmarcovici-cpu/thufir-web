@@ -107,6 +107,26 @@ export default function ProjectDetailPage() {
   const [view, setView] = useState<"dash" | "duel">("dash");
   const [project, setProject] = useState<any>(null);
   const isAdmin = ["owner", "editor"].includes(project?.role || "");
+  const isOwner = (project?.role || "") === "owner";
+  const [teamOpen, setTeamOpen] = useState(false);
+  const [team, setTeam] = useState<any>(null);
+  const [invEmail, setInvEmail] = useState("");
+  const [invRole, setInvRole] = useState<"editor" | "viewer">("viewer");
+  const [invLink, setInvLink] = useState("");
+  async function loadTeam() {
+    try { const t = await call(`/auth/projects/${id}/members`, "GET"); setTeam(t); } catch { /* noop */ }
+  }
+  async function sendInvite() {
+    if (!invEmail.trim()) return;
+    setError(null); setInvLink("");
+    try {
+      const r = await call(`/auth/projects/${id}/invite`, "POST", { email: invEmail.trim(), role: invRole });
+      const link = `${window.location.origin}/accept?token=${r.invite_token}`;
+      setInvLink(link);
+      setMsg("Invite created — copy the link and send it to them.");
+      loadTeam();
+    } catch (e: any) { setError(e.message || "Couldn't create the invite."); }
+  }
   const [coord, setCoord] = useState<any>(null);
   async function loadCoord() {
     if (!idValid) return;
@@ -393,8 +413,9 @@ export default function ProjectDetailPage() {
                 <button data-on={view === "duel"} onClick={() => setView("duel")}>HEAD-TO-HEAD</button>
               </div>
               <button className="btn btn-primary" disabled={analyzing} onClick={() => analyze(false)}>{analyzing ? "ANALYSING…" : "Re-analyse"}</button>
-              <button className="btn" disabled={analyzing} onClick={() => analyze(true)}>Deep tone (Elena)</button>
+              {isAdmin && (<button className="btn" disabled={analyzing} onClick={() => analyze(true)}>Deep tone (Elena)</button>)}
               {isAdmin && (<button className="btn" disabled={reproc} onClick={rebuildIndex}>{reproc ? "Rebuilding…" : "Rebuild semantic index"}</button>)}
+              {isOwner && (<button className="btn" onClick={() => { setTeamOpen(true); loadTeam(); }}>Team</button>)}
             </div>
           </div>
         )}
@@ -936,10 +957,6 @@ export default function ProjectDetailPage() {
                   </div>
                 </div>
               </div>
-            </>
-          )}
-        </div>
-
         <div className="panel" style={{ marginTop: 14 }}>
           <div className="panel-head"><NetworkIcon />Coordination
             <span className="ph-right">
@@ -992,6 +1009,61 @@ export default function ProjectDetailPage() {
             )}
           </div>
         </div>
+
+            </>
+          )}
+        </div>
+
+        {teamOpen && (
+          <div onClick={() => setTeamOpen(false)} style={{ position: "fixed", inset: 0, background: "rgba(13,14,18,0.82)", zIndex: 60, display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }}>
+            <div onClick={(e) => e.stopPropagation()} className="panel" style={{ width: "100%", maxWidth: 560, maxHeight: "82vh", display: "flex", flexDirection: "column" }}>
+              <div className="panel-head">Team &amp; access
+                <span className="ph-right"><button className="btn btn-quiet" style={{ fontSize: 12 }} onClick={() => setTeamOpen(false)}>CLOSE ×</button></span>
+              </div>
+              <div className="panel-body" style={{ overflowY: "auto" }}>
+                <div style={{ marginBottom: 14 }}>
+                  <div className="muted" style={{ fontSize: 11, letterSpacing: ".05em", marginBottom: 8 }}>INVITE SOMEONE</div>
+                  <input className="select" style={{ width: "100%", marginBottom: 8, padding: "8px 10px" }} type="email" placeholder="their email" value={invEmail} onChange={(e) => setInvEmail(e.target.value)} />
+                  <div style={{ display: "flex", gap: 8, marginBottom: 8 }}>
+                    <button onClick={() => setInvRole("editor")} style={{ flex: 1, padding: "7px 0", borderRadius: 3, border: "1px solid var(--carbon)", background: invRole === "editor" ? "var(--carbon)" : "transparent", color: "inherit", cursor: "pointer", fontSize: 12 }}>
+                      OPERATOR<div className="muted" style={{ fontSize: 9, marginTop: 2 }}>full — can spend</div>
+                    </button>
+                    <button onClick={() => setInvRole("viewer")} style={{ flex: 1, padding: "7px 0", borderRadius: 3, border: "1px solid var(--carbon)", background: invRole === "viewer" ? "var(--carbon)" : "transparent", color: "inherit", cursor: "pointer", fontSize: 12 }}>
+                      OBSERVER<div className="muted" style={{ fontSize: 9, marginTop: 2 }}>view only — no spend</div>
+                    </button>
+                  </div>
+                  <button className="btn btn-primary" style={{ width: "100%" }} onClick={sendInvite}>Create invite link</button>
+                  {invLink && (
+                    <div style={{ marginTop: 8, padding: 8, background: "var(--void)", borderRadius: 3, wordBreak: "break-all", ...MONO, fontSize: 10 }}>
+                      {invLink}
+                      <button className="btn btn-quiet" style={{ fontSize: 10, marginTop: 6 }} onClick={() => { navigator.clipboard?.writeText(invLink); setMsg("Link copied."); }}>COPY LINK</button>
+                    </div>
+                  )}
+                </div>
+                <div style={{ borderTop: "1px solid var(--carbon)", paddingTop: 12 }}>
+                  <div className="muted" style={{ fontSize: 11, letterSpacing: ".05em", marginBottom: 8 }}>ON THIS PROJECT</div>
+                  {(team?.members || []).map((m: any) => (
+                    <div key={m.email} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "6px 0", borderBottom: "1px solid var(--rowline)" }}>
+                      <span style={{ fontSize: 13 }}>{m.display_name || m.email} <span className="muted" style={{ fontSize: 11 }}>{m.email}</span></span>
+                      <span style={{ ...MONO, fontSize: 10, color: m.role === "owner" ? "var(--amber)" : "var(--muted)" }}>{m.role === "editor" ? "OPERATOR" : m.role === "viewer" ? "OBSERVER" : "OWNER"}</span>
+                    </div>
+                  ))}
+                  {(team?.pending || []).length > 0 && (
+                    <>
+                      <div className="muted" style={{ fontSize: 10, letterSpacing: ".05em", margin: "10px 0 6px" }}>PENDING</div>
+                      {team.pending.map((p: any) => (
+                        <div key={p.email} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "5px 0", borderBottom: "1px solid var(--rowline)", opacity: 0.7 }}>
+                          <span style={{ fontSize: 12 }}>{p.email}</span>
+                          <span style={{ ...MONO, fontSize: 10, color: "var(--muted)" }}>{p.role === "editor" ? "OPERATOR" : "OBSERVER"} · invited</span>
+                        </div>
+                      ))}
+                    </>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
 
         {topicDetail.open && (
           <div onClick={() => setTopicDetail({ open: false, loading: false, data: null })}
