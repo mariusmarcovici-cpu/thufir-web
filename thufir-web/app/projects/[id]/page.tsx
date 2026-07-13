@@ -627,9 +627,9 @@ export default function ProjectDetailPage() {
                   </div>
               </div>
 
-              {/* Row 2 — topic map · clusters · scout */}
+              {/* Row 2 — topic map · clusters */}
               <div className="ops-stack">
-                <div className="panel" style={{ flex: 40 }}>
+                <div className="panel" style={{ flex: 55 }}>
                   <div className="panel-head"><TrendIcon />Topic map
                     <span className="ph-right">
                       <span className="muted" style={{ fontSize: 11, fontFamily: "var(--font)", letterSpacing: 0, marginRight: 8 }}>click a bubble to read its posts</span>
@@ -650,7 +650,7 @@ export default function ProjectDetailPage() {
                   </div>
                 </div>
 
-                <div className="panel" style={{ flex: 33 }}>
+                <div className="panel" style={{ flex: 45 }}>
                   <div className="panel-head"><NetworkIcon />Engagement clusters
                     {velo?.network_integrity != null && <span className="ph-right"><span className="chip" style={{ color: "#8FBFA6" }}>NETWORK INTEGRITY {Math.round(velo.network_integrity * 100)}%</span></span>}
                   </div>
@@ -673,51 +673,6 @@ export default function ProjectDetailPage() {
                   </div>
                 </div>
 
-                <div className="panel" style={{ flex: 27 }}>
-                  <div className="panel-head"><NetworkIcon />Market scout</div>
-                  <div className="panel-body" style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-                    {isAdmin && (<button className="btn btn-primary" style={{ width: "100%" }} disabled={scouting} onClick={scout}>{scouting ? "SCOUTING…" : "Scout the market"}</button>)}
-                    <div className="muted" style={{ fontSize: 11 }}>Runs daily · auto-adds pages &amp; hashtags · budget-guarded.</div>
-                    {opsEvents.length > 0 && (
-                      <div>
-                        <div className="stat-label">Ops feed</div>
-                        <div style={{ background: "var(--void)", border: "1px solid var(--carbon)", padding: "8px 10px", display: "flex", flexDirection: "column", gap: 4 }}>
-                          {opsEvents.slice(0, 3).map((e: any, i: number) => (
-                            <div key={i} className="muted" style={{ ...MONO, fontSize: 10 }}>{e.ts.slice(5, 16).replace("T", " ")} · {e.kind}: {e.detail}</div>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-                    {(disc.pages || []).length > 0 && (
-                      <div style={{ marginBottom: 10 }}>
-                        <div className="muted" style={{ fontSize: 11, marginBottom: 5, letterSpacing: ".04em" }}>SCOUT PROPOSES — pages mentioned often enough to matter. Nothing joins the roster without your word.</div>
-                        {(disc.pages || []).slice(0, 6).map((p: any) => (
-                          <div key={p.ref} style={{ display: "flex", alignItems: "center", gap: 8, padding: "6px 0", borderBottom: "1px solid var(--rowline)" }}>
-                            <span style={{ fontSize: 12, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flex: 1 }}><Ext href={p.ref}>{String(p.ref).replace("https://www.facebook.com/", "").replace("https://facebook.com/", "")} ↗</Ext></span>
-                            <span style={{ ...MONO, fontSize: 10, color: "var(--amber)" }}>·{p.co_count}</span>
-                            {p.locality === 1 && <span style={{ ...MONO, fontSize: 9, color: "var(--green, #3FA36B)", flexShrink: 0 }}>ST. LUCIA</span>}
-                            {p.locality === 3 && <span style={{ ...MONO, fontSize: 9, color: "var(--danger)", flexShrink: 0 }} title={p.service_area || ""}>ELSEWHERE</span>}
-                            {p.category && <span className="muted" style={{ ...MONO, fontSize: 9, flexShrink: 0 }}>{p.category}</span>}
-{isAdmin && (<>                            <button className="btn btn-quiet" style={{ fontSize: 10, padding: "2px 8px" }} onClick={() => scoutDecide(p.ref, "approve")}>APPROVE</button>
-                            <button style={{ border: "1px solid var(--carbon)", background: "transparent", color: "var(--danger)", cursor: "pointer", fontSize: 10, padding: "2px 8px", borderRadius: 0 }} onClick={() => scoutDecide(p.ref, "reject")}>REJECT</button></>)}
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                    {disc.topics.length > 0 && (
-                      <div>
-                        <div className="stat-label">Hashtags</div>
-                        <div className="row" style={{ gap: 6, flexWrap: "wrap" }}>{disc.topics.slice(0, 8).map((t: any) => <span key={t.ref} className="chip">#{t.ref} <span style={{ color: "var(--amber)" }}>·{t.co_count}</span></span>)}</div>
-                      </div>
-                    )}
-                    {disc.domains.length > 0 && (
-                      <div>
-                        <div className="stat-label">Sources</div>
-                        <div className="row" style={{ gap: 6, flexWrap: "wrap" }}>{disc.domains.slice(0, 6).map((d: any) => <span key={d.ref} className="chip" style={{ color: "#6E8FB0" }}>{d.ref} ·{d.co_count}</span>)}</div>
-                      </div>
-                    )}
-                  </div>
-                </div>
               </div>
 
               {/* Row 3 — leaderboard · compare */}
@@ -957,6 +912,55 @@ export default function ProjectDetailPage() {
                   </div>
                 </div>
               </div>
+              {/* Row 5 — market scout (roster tools live below the read) */}
+              <div className="ops-stack">
+                <div className="panel" style={{ flex: 1 }}>
+                  <div className="panel-head"><NetworkIcon />Market scout</div>
+                  <div className="panel-body" style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+                    {isAdmin && (<button className="btn btn-primary" style={{ width: "100%" }} disabled={scouting} onClick={scout}>{scouting ? "SCOUTING…" : "Scout the market"}</button>)}
+                    <div className="muted" style={{ fontSize: 11 }}>Runs daily · auto-adds pages &amp; hashtags · budget-guarded.</div>
+                    {opsEvents.length > 0 && (
+                      <div>
+                        <div className="stat-label">Ops feed</div>
+                        <div style={{ background: "var(--void)", border: "1px solid var(--carbon)", padding: "8px 10px", display: "flex", flexDirection: "column", gap: 4 }}>
+                          {opsEvents.slice(0, 3).map((e: any, i: number) => (
+                            <div key={i} className="muted" style={{ ...MONO, fontSize: 10 }}>{e.ts.slice(5, 16).replace("T", " ")} · {e.kind}: {e.detail}</div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                    {(disc.pages || []).length > 0 && (
+                      <div style={{ marginBottom: 10 }}>
+                        <div className="muted" style={{ fontSize: 11, marginBottom: 5, letterSpacing: ".04em" }}>SCOUT PROPOSES — pages mentioned often enough to matter. Nothing joins the roster without your word.</div>
+                        {(disc.pages || []).slice(0, 6).map((p: any) => (
+                          <div key={p.ref} style={{ display: "flex", alignItems: "center", gap: 8, padding: "6px 0", borderBottom: "1px solid var(--rowline)" }}>
+                            <span style={{ fontSize: 12, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flex: 1 }}><Ext href={p.ref}>{String(p.ref).replace("https://www.facebook.com/", "").replace("https://facebook.com/", "")} ↗</Ext></span>
+                            <span style={{ ...MONO, fontSize: 10, color: "var(--amber)" }}>·{p.co_count}</span>
+                            {p.locality === 1 && <span style={{ ...MONO, fontSize: 9, color: "var(--green, #3FA36B)", flexShrink: 0 }}>ST. LUCIA</span>}
+                            {p.locality === 3 && <span style={{ ...MONO, fontSize: 9, color: "var(--danger)", flexShrink: 0 }} title={p.service_area || ""}>ELSEWHERE</span>}
+                            {p.category && <span className="muted" style={{ ...MONO, fontSize: 9, flexShrink: 0 }}>{p.category}</span>}
+{isAdmin && (<>                            <button className="btn btn-quiet" style={{ fontSize: 10, padding: "2px 8px" }} onClick={() => scoutDecide(p.ref, "approve")}>APPROVE</button>
+                            <button style={{ border: "1px solid var(--carbon)", background: "transparent", color: "var(--danger)", cursor: "pointer", fontSize: 10, padding: "2px 8px", borderRadius: 0 }} onClick={() => scoutDecide(p.ref, "reject")}>REJECT</button></>)}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                    {disc.topics.length > 0 && (
+                      <div>
+                        <div className="stat-label">Hashtags</div>
+                        <div className="row" style={{ gap: 6, flexWrap: "wrap" }}>{disc.topics.slice(0, 8).map((t: any) => <span key={t.ref} className="chip">#{t.ref} <span style={{ color: "var(--amber)" }}>·{t.co_count}</span></span>)}</div>
+                      </div>
+                    )}
+                    {disc.domains.length > 0 && (
+                      <div>
+                        <div className="stat-label">Sources</div>
+                        <div className="row" style={{ gap: 6, flexWrap: "wrap" }}>{disc.domains.slice(0, 6).map((d: any) => <span key={d.ref} className="chip" style={{ color: "#6E8FB0" }}>{d.ref} ·{d.co_count}</span>)}</div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+
         <div className="panel" style={{ marginTop: 14 }}>
           <div className="panel-head"><NetworkIcon />Coordination
             <span className="ph-right">
@@ -1034,9 +1038,13 @@ export default function ProjectDetailPage() {
                   </div>
                   <button className="btn btn-primary" style={{ width: "100%" }} onClick={sendInvite}>Create invite link</button>
                   {invLink && (
-                    <div style={{ marginTop: 8, padding: 8, background: "var(--void)", borderRadius: 3, wordBreak: "break-all", ...MONO, fontSize: 10 }}>
-                      {invLink}
-                      <button className="btn btn-quiet" style={{ fontSize: 10, marginTop: 6 }} onClick={() => { navigator.clipboard?.writeText(invLink); setMsg("Link copied."); }}>COPY LINK</button>
+                    <div style={{ marginTop: 8 }}>
+                      <input readOnly value={invLink} onFocus={(e) => e.currentTarget.select()}
+                        style={{ width: "100%", padding: 8, background: "var(--void)", border: "1px solid var(--carbon)", borderRadius: 3, color: "inherit", ...MONO, fontSize: 10 }} />
+                      <button className="btn btn-quiet" style={{ fontSize: 10, marginTop: 6 }} onClick={async () => {
+                        try { await navigator.clipboard.writeText(invLink); setMsg("Link copied."); }
+                        catch { setError("Clipboard blocked — click the link box (it selects itself) and copy manually."); }
+                      }}>COPY LINK</button>
                     </div>
                   )}
                 </div>
