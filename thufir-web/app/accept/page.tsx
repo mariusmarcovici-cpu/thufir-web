@@ -86,7 +86,7 @@ function AcceptInner() {
       <h2 style={{ margin: "0 0 4px" }}>{info.project_name}</h2>
       <p style={{ marginTop: 0, color: "var(--muted, #8B949E)", fontSize: 14 }}>
         You&apos;ve been invited as <b style={{ color: "var(--amber, #C2A34F)" }}>{ROLE_LABEL[info.role] || info.role}</b>
-        {info.role === "viewer" ? " — you can view everything, but actions that cost money are the owner&apos;s." : " — full access to operate the project."}
+        {info.role === "viewer" ? " — you have full view of the project. Adding sources and running operations stays with the project team." : " — full access to operate the project."}
       </p>
 
       {user ? (
