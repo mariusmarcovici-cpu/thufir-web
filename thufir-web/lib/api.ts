@@ -39,6 +39,19 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
     } catch {
       /* ignore non-JSON errors */
     }
+    // Session expired mid-use: send the person back to the sign-in screen
+    // instead of leaving dead panels. Never fires for anonymous probes
+    // (/auth/me without a token), the auth endpoints themselves, or the
+    // invite-accept page (it runs its own sign-in flow).
+    const AUTH_PATHS = ["/auth/login", "/auth/register", "/auth/me", "/auth/invite-info", "/auth/accept-invite"];
+    if (
+      res.status === 401 && token && typeof window !== "undefined" &&
+      !AUTH_PATHS.some((a) => path.startsWith(a)) &&
+      window.location.pathname !== "/" && window.location.pathname !== "/accept"
+    ) {
+      clearToken();
+      window.location.href = "/";
+    }
     throw new ApiError(res.status, typeof detail === "string" ? detail : "Request failed");
   }
   if (res.status === 204) return undefined as T;
