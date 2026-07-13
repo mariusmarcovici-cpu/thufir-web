@@ -172,6 +172,8 @@ export default function ProjectDetailPage() {
   const [duelA, setDuelA] = useState<string>("");
   const [duelB, setDuelB] = useState<string>("");
   const [urls, setUrls] = useState("https://stluciatimes.com/feed/\n");
+  const [dedup, setDedup] = useState<any>(null);        // null = strip closed
+  const [dedupBusy, setDedupBusy] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [picked, setPicked] = useState<Set<string>>(new Set());
@@ -262,6 +264,38 @@ export default function ProjectDetailPage() {
     } catch (e: any) { setError(e.message || "Couldn't remove the source."); }
   }
 
+  async function loadDedup() {
+    if (!idValid) return;
+    setDedupBusy(true); setError(null);
+    try { setDedup(await call(`/projects/${id}/dedup`, "GET")); }
+    catch (e: any) { setError(e.message || "Couldn't scan for duplicates."); }
+    finally { setDedupBusy(false); }
+  }
+
+  async function dedupBackfill() {
+    if (!idValid) return;
+    setDedupBusy(true); setError(null);
+    try {
+      const r = await call(`/projects/${id}/dedup/backfill`, "POST");
+      setMsg(r.merged ? `Auto-merged ${r.merged} cosmetic URL variants.` : "No cosmetic variants to merge.");
+      await loadDedup(); await loadMeta();
+    } catch (e: any) { setError(e.message || "Auto-merge failed."); }
+    finally { setDedupBusy(false); }
+  }
+
+  async function dedupDecide(eliminate: string[], dismiss: string[], label?: string) {
+    if (!idValid) return;
+    if (eliminate.length && !confirm(`ELIMINATE this source?\n\n${label || eliminate.length + " sources"}\n\nIt is deleted, its data leaves the views, and it is PERMANENTLY BANNED — the scout and the collectors will never re-admit it. Only pasting it again (with the add-anyway confirmation) can bring it back.`)) return;
+    setDedupBusy(true); setError(null);
+    try {
+      const r = await call(`/projects/${id}/dedup/decide`, "POST", { eliminate, dismiss });
+      if (eliminate.length) setMsg(`Eliminated ${r.eliminated?.length || 0} source(s) — permanently banned.`);
+      else setMsg("Kept — this proposal won't be raised again.");
+      await loadDedup(); await loadMeta();
+    } catch (e: any) { setError(e.message || "Couldn't apply the decision."); }
+    finally { setDedupBusy(false); }
+  }
+
   function eidOf(ref: string): string {
     const m = String(ref || "").match(/facebook\.com\/([^/?#]+)/);
     return ("fb:" + (m ? m[1].toLowerCase() : "unknown")).slice(0, 32);
@@ -344,9 +378,19 @@ export default function ProjectDetailPage() {
     if (!window.confirm("This runs a fresh paid Apify scrape. The daily scheduler already collects once a day automatically — only collect manually if you need up-to-the-minute data. Continue?")) return;
     setBusy(true); setError(null); setMsg(null);
     try {
-      const r = await call(`/projects/${id}/sources`, "POST", { urls: urls.split("\n") });
+      let r = await call(`/projects/${id}/sources`, "POST", { urls: urls.split("\n") });
+      if (r?.banned_matches?.length) {
+        const list = r.banned_matches.map((b: any) =>
+          `\u2022 ${b.url}${b.banned_at ? ` (eliminated ${String(b.banned_at).slice(0, 10)})` : ""}${b.reason ? ` — ${b.reason}` : ""}`).join("\n");
+        if (window.confirm(`These sources were previously ELIMINATED and are permanently banned:\n\n${list}\n\nAdd anyway? This lifts their ban and they become normal sources again.`)) {
+          r = await call(`/projects/${id}/sources`, "POST", { urls: urls.split("\n"), override_banned: true });
+        }
+      }
       const note = r?.facebook?.error ? ` (Facebook: ${r.facebook.error})` : "";
-      const src = r?.sources ? ` Sources: ${r.sources.found_in_paste} found, ${r.sources.newly_added} new${r.sources.categorized ? `, ${r.sources.categorized} auto-categorized` : ""}.` : "";
+      const merged = r?.sources?.merged_variants ? `, ${r.sources.merged_variants} variants merged` : "";
+      const lifted = r?.sources?.bans_lifted ? `, ${r.sources.bans_lifted} bans lifted` : "";
+      const skipped = r?.sources?.blocked_skipped ? `, ${r.sources.blocked_skipped} eliminated skipped` : "";
+      const src = r?.sources ? ` Sources: ${r.sources.found_in_paste} found, ${r.sources.newly_added} new${r.sources.categorized ? `, ${r.sources.categorized} auto-categorized` : ""}${merged}${lifted}${skipped}.` : "";
       setMsg(`Collected ${r?.news?.new_items ?? 0} news, ${r?.facebook?.new_items ?? 0} FB posts${note}.${src}`);
       await analyze();
     } catch (e: any) { setError(e.message || "Collection failed."); }
@@ -859,6 +903,13 @@ export default function ProjectDetailPage() {
                 <div className="panel" style={{ flex: 22 }}>
                   <div className="panel-head"><NetworkIcon />Sources
                     <span className="ph-right">
+                      {isAdmin && (
+                        <button className="btn" style={{ fontSize: 9, padding: "4px 10px", marginRight: 6 }}
+                          disabled={dedupBusy}
+                          onClick={() => { if (dedup) setDedup(null); else loadDedup(); }}>
+                          {dedupBusy ? "SCANNING…" : dedup ? "CLOSE" : "HOUSEKEEP"}
+                        </button>
+                      )}
                       <button className="btn" style={{ fontSize: 9, padding: "4px 10px" }}
                         onClick={() => {
                           const d: Record<string, string> = {};
@@ -871,6 +922,48 @@ export default function ProjectDetailPage() {
                     </span>
                   </div>
                   <div className="panel-body" style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                    {dedup && (
+                      <div style={{ border: "1px solid var(--carbon)", background: "var(--void)", padding: 10, maxHeight: 320, overflowY: "auto" }}>
+                        <div className="stat-label" style={{ marginBottom: 8 }}>Housekeeping — duplicates &amp; dead sources</div>
+                        {(dedup.cosmetic?.length || 0) > 0 && (
+                          <div style={{ marginBottom: 10, paddingBottom: 8, borderBottom: "1px solid var(--rowline)" }}>
+                            <div style={{ fontSize: 10, color: "var(--text-2)", marginBottom: 6 }}>
+                              {dedup.cosmetic.reduce((n: number, g: any) => n + g.merge.length, 0)} cosmetic URL variant(s) of existing sources (http/www/slash only) — safe to merge automatically.
+                            </div>
+                            {dedup.cosmetic.map((g: any, i: number) => (
+                              <div key={i} style={{ fontFamily: "var(--font-mono)", fontSize: 9, color: "var(--text-2)", padding: "2px 0" }}>
+                                {g.merge.map((m: any) => m.public_ref).join(", ")} → <span style={{ color: "var(--amber, #C2A34F)" }}>{g.keep.public_ref}</span>
+                              </div>
+                            ))}
+                            <button className="btn btn-primary" style={{ marginTop: 6, fontSize: 9, padding: "4px 10px" }} disabled={dedupBusy} onClick={dedupBackfill}>Auto-merge variants</button>
+                          </div>
+                        )}
+                        {(dedup.proposals?.length || 0) === 0 && (dedup.cosmetic?.length || 0) === 0 && (
+                          <div className="muted" style={{ fontSize: 11 }}>Roster is clean — no duplicates or dead sources found.</div>
+                        )}
+                        {(dedup.proposals || []).map((g: any, i: number) => (
+                          <div key={i} style={{ padding: "6px 0", borderBottom: "1px solid var(--rowline)" }}>
+                            <div style={{ fontSize: 10, marginBottom: 4 }}>
+                              <span style={{ color: g.kind === "dead" ? "var(--danger)" : "var(--amber, #C2A34F)", fontWeight: 600, textTransform: "uppercase", fontSize: 9 }}>{g.kind}</span>
+                              <span className="muted" style={{ marginLeft: 8, fontSize: 10 }}>{g.reason}</span>
+                            </div>
+                            {g.anchors.map((a: any) => (
+                              <div key={a.id} style={{ display: "flex", alignItems: "center", gap: 8, padding: "3px 0" }}>
+                                <span style={{ fontFamily: "var(--font-mono)", fontSize: 9, flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", color: a.id === g.suggested_keep ? "var(--amber, #C2A34F)" : "var(--text-2)" }}
+                                  title={a.public_ref}>
+                                  {(a.public_ref || a.label || "").replace("https://www.facebook.com/", "fb/").replace("https://", "")}
+                                  <span className="muted"> · {a.items} item{a.items === 1 ? "" : "s"}{a.id === g.suggested_keep ? " · suggested keep" : ""}</span>
+                                </span>
+                                <button className="btn" style={{ fontSize: 8, padding: "2px 8px" }} disabled={dedupBusy}
+                                  onClick={() => dedupDecide([], [a.id])}>KEEP</button>
+                                <button style={{ border: "1px solid var(--carbon)", background: "transparent", color: "var(--danger)", cursor: "pointer", fontSize: 8, padding: "2px 8px" }} disabled={dedupBusy}
+                                  onClick={() => dedupDecide([a.id], [], a.public_ref || a.label)}>ELIMINATE</button>
+                              </div>
+                            ))}
+                          </div>
+                        ))}
+                      </div>
+                    )}
                     {catEdit && (
                       <div style={{ border: "1px solid var(--carbon)", background: "var(--void)", padding: 10, maxHeight: 260, overflowY: "auto" }}>
                         <div className="stat-label" style={{ marginBottom: 8 }}>Assign each source a category</div>
