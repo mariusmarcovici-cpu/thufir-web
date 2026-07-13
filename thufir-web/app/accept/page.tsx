@@ -54,6 +54,7 @@ function AcceptInner() {
     try {
       if (mode === "login") await login(email, password);
       else await register(email, password, name || email.split("@")[0]);
+      setBusy(false); // release the flag so the auto-accept effect can fire (fixes the "Joining…" hang)
       // the auth context updates; the effect above will fire doAccept()
     } catch (e: any) {
       setError(e instanceof ApiError ? e.message : "Sign-in failed.");
