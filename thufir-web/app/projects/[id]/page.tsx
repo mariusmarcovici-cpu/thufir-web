@@ -1012,11 +1012,11 @@ export default function ProjectDetailPage() {
                               onChange={(e) => setKindDraft((cur) => ({ ...cur, [a.id]: e.target.value }))}>
                               {["media", "group", "politician", "government", "institution", "other"].map((k) => <option key={k} value={k}>{k}</option>)}
                             </select>
-                            <select className="select" title="Faction — YOUR judgment. Penetration measures how far a narrative travels OUTSIDE the faction it started in. Never inferred by the machine."
+                            <select className="select" title="Faction — YOUR judgment, never the machine&apos;s. state = the government machinery (ministries, police). coalition = the governing political side (SLP, ministers, incl. the independents in cabinet). Penetration measures how far a narrative escapes its own BLOC — a ministry post landing only on party pages has NOT spread."
                               style={{ width: 108, fontSize: 10, padding: "3px 6px" }}
                               value={factionDraft[a.id] ?? (a.faction || "unknown")}
                               onChange={(e) => setFactionDraft((cur) => ({ ...cur, [a.id]: e.target.value }))}>
-                              {["unknown", "government", "opposition", "media", "neutral"].map((f) => <option key={f} value={f}>{f}</option>)}
+                              {["unknown", "state", "coalition", "opposition", "media", "civil", "neutral"].map((f) => <option key={f} value={f}>{f}</option>)}
                             </select>
                             {isAdmin && <button title="Remove this source" onClick={() => deleteSource(a.id, a.public_ref || a.label)}
                               style={{ border: "1px solid var(--carbon)", background: "transparent", color: "var(--danger)", cursor: "pointer", fontSize: 11, padding: "2px 7px", borderRadius: 0, flexShrink: 0 }}>×</button>}
