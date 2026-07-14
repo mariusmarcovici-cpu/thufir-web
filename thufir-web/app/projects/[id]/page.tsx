@@ -104,7 +104,7 @@ export default function ProjectDetailPage() {
   const id = params.id as string;
   const idValid = !!id && id !== "undefined" && id !== "null";
 
-  const [view, setView] = useState<"dash" | "duel">("dash");
+  const [view, setView] = useState<"dash" | "duel" | "setup">("dash");
   const [project, setProject] = useState<any>(null);
   const isAdmin = ["owner", "editor"].includes(project?.role || "");
   const isOwner = (project?.role || "") === "owner";
@@ -495,6 +495,7 @@ export default function ProjectDetailPage() {
               <div className="seg">
                 <button data-on={view === "dash"} onClick={() => setView("dash")}>DASHBOARD</button>
                 <button data-on={view === "duel"} onClick={() => setView("duel")}>HEAD-TO-HEAD</button>
+                <button data-on={view === "setup"} onClick={() => setView("setup")}>SETUP</button>
               </div>
               <button className="btn btn-primary" disabled={analyzing} onClick={() => analyze(false)}>{analyzing ? "ANALYSING…" : "Re-analyse"}</button>
               {isAdmin && (<button className="btn" disabled={analyzing} onClick={() => analyze(true)}>Deep tone (Elena)</button>)}
@@ -940,164 +941,6 @@ export default function ProjectDetailPage() {
                   </div>
                 </div>
 
-                <div className="panel" style={{ flex: 22 }}>
-                  <div className="panel-head"><NetworkIcon />Sources
-                    <span className="ph-right">
-                      {isAdmin && (
-                        <button className="btn" style={{ fontSize: 9, padding: "4px 10px", marginRight: 6 }}
-                          disabled={dedupBusy}
-                          onClick={() => { if (dedup) setDedup(null); else loadDedup(); }}>
-                          {dedupBusy ? "SCANNING…" : dedup ? "CLOSE" : "HOUSEKEEP"}
-                        </button>
-                      )}
-                      <button className="btn" style={{ fontSize: 9, padding: "4px 10px" }}
-                        onClick={() => {
-                          const d: Record<string, string> = {};
-                          (project?.anchors || []).forEach((a: any) => { d[a.id] = a.kind || "other"; });
-                          setKindDraft(d);
-                          setCatEdit(!catEdit);
-                        }}>
-                        {catEdit ? "CLOSE" : "CATEGORIZE"}
-                      </button>
-                    </span>
-                  </div>
-                  <div className="panel-body" style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-                    {dedup && (
-                      <div style={{ border: "1px solid var(--carbon)", background: "var(--void)", padding: 10, maxHeight: 320, overflowY: "auto" }}>
-                        <div className="stat-label" style={{ marginBottom: 8 }}>Housekeeping — duplicates &amp; dead sources</div>
-                        {(dedup.cosmetic?.length || 0) > 0 && (
-                          <div style={{ marginBottom: 10, paddingBottom: 8, borderBottom: "1px solid var(--rowline)" }}>
-                            <div style={{ fontSize: 10, color: "var(--text-2)", marginBottom: 6 }}>
-                              {dedup.cosmetic.reduce((n: number, g: any) => n + g.merge.length, 0)} cosmetic URL variant(s) of existing sources (http/www/slash only) — safe to merge automatically.
-                            </div>
-                            {dedup.cosmetic.map((g: any, i: number) => (
-                              <div key={i} style={{ fontFamily: "var(--font-mono)", fontSize: 9, color: "var(--text-2)", padding: "2px 0" }}>
-                                {g.merge.map((m: any) => m.public_ref).join(", ")} → <span style={{ color: "var(--amber, #C2A34F)" }}>{g.keep.public_ref}</span>
-                              </div>
-                            ))}
-                            <button className="btn btn-primary" style={{ marginTop: 6, fontSize: 9, padding: "4px 10px" }} disabled={dedupBusy} onClick={dedupBackfill}>Auto-merge variants</button>
-                          </div>
-                        )}
-                        {(dedup.proposals?.length || 0) === 0 && (dedup.cosmetic?.length || 0) === 0 && (
-                          <div className="muted" style={{ fontSize: 11 }}>Roster is clean — no duplicates or dead sources found.</div>
-                        )}
-                        {(dedup.proposals || []).map((g: any, i: number) => (
-                          <div key={i} style={{ padding: "6px 0", borderBottom: "1px solid var(--rowline)" }}>
-                            <div style={{ fontSize: 10, marginBottom: 4 }}>
-                              <span style={{ color: g.kind === "dead" ? "var(--danger)" : "var(--amber, #C2A34F)", fontWeight: 600, textTransform: "uppercase", fontSize: 9 }}>{g.kind}</span>
-                              <span className="muted" style={{ marginLeft: 8, fontSize: 10 }}>{g.reason}</span>
-                            </div>
-                            {g.anchors.map((a: any) => (
-                              <div key={a.id} style={{ display: "flex", alignItems: "center", gap: 8, padding: "3px 0" }}>
-                                <span style={{ fontFamily: "var(--font-mono)", fontSize: 9, flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", color: a.id === g.suggested_keep ? "var(--amber, #C2A34F)" : "var(--text-2)" }}
-                                  title={a.public_ref}>
-                                  {(a.public_ref || a.label || "").replace("https://www.facebook.com/", "fb/").replace("https://", "")}
-                                  <span className="muted"> · {a.items} item{a.items === 1 ? "" : "s"}{a.id === g.suggested_keep ? " · suggested keep" : ""}</span>
-                                </span>
-                                <button className="btn" style={{ fontSize: 8, padding: "2px 8px" }} disabled={dedupBusy}
-                                  onClick={() => dedupDecide([], [a.id])}>KEEP</button>
-                                <button style={{ border: "1px solid var(--carbon)", background: "transparent", color: "var(--danger)", cursor: "pointer", fontSize: 8, padding: "2px 8px" }} disabled={dedupBusy}
-                                  onClick={() => dedupDecide([a.id], [], a.public_ref || a.label)}>ELIMINATE</button>
-                              </div>
-                            ))}
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                    {catEdit && (
-                      <div style={{ border: "1px solid var(--carbon)", background: "var(--void)", padding: 10, maxHeight: 260, overflowY: "auto" }}>
-                        <div className="stat-label" style={{ marginBottom: 8 }}>Assign each source a category</div>
-                        {(project?.anchors || []).map((a: any) => (
-                          <div key={a.id} style={{ display: "flex", alignItems: "center", gap: 8, padding: "4px 0", borderBottom: "1px solid var(--rowline)" }}>
-                            <span style={{ fontFamily: "var(--font-mono)", fontSize: 10, color: "var(--text-2)", flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                              {(a.public_ref || a.label || "").replace("https://www.facebook.com/", "fb/").replace("https://", "")}
-                            </span>
-                            {(a.page_category || a.service_area) && (
-                              <span className="muted" style={{ ...MONO, fontSize: 9, flexShrink: 0, maxWidth: 150, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={`${a.page_category || ""}${a.service_area ? " · " + a.service_area : ""}`}>
-                                {a.page_category || "?"}{a.service_area ? ` · ${a.service_area}` : ""}
-                              </span>
-                            )}
-                            <select className="select" style={{ width: 110, fontSize: 10, padding: "3px 6px" }}
-                              value={kindDraft[a.id] ?? (a.kind || "other")}
-                              onChange={(e) => setKindDraft((cur) => ({ ...cur, [a.id]: e.target.value }))}>
-                              {["media", "group", "politician", "government", "institution", "other"].map((k) => <option key={k} value={k}>{k}</option>)}
-                            </select>
-                            <select className="select" title="Faction — YOUR judgment, never the machine&apos;s. state = the government machinery (ministries, police). coalition = the governing political side (SLP, ministers, incl. the independents in cabinet). Penetration measures how far a narrative escapes its own BLOC — a ministry post landing only on party pages has NOT spread."
-                              style={{ width: 108, fontSize: 10, padding: "3px 6px" }}
-                              value={factionDraft[a.id] ?? (a.faction || "unknown")}
-                              onChange={(e) => setFactionDraft((cur) => ({ ...cur, [a.id]: e.target.value }))}>
-                              {["unknown", "state", "coalition", "opposition", "media", "civil", "neutral"].map((f) => <option key={f} value={f}>{f}</option>)}
-                            </select>
-                            {isAdmin && <button title="Remove this source" onClick={() => deleteSource(a.id, a.public_ref || a.label)}
-                              style={{ border: "1px solid var(--carbon)", background: "transparent", color: "var(--danger)", cursor: "pointer", fontSize: 11, padding: "2px 7px", borderRadius: 0, flexShrink: 0 }}>×</button>}
-                          </div>
-                        ))}
-                        <button className="btn btn-primary" style={{ marginTop: 10 }} onClick={saveKinds}>Save categories</button>
-                      </div>
-                    )}
-                    <div className="muted" style={{ fontSize: 11 }}>Paste anything — the app extracts and cleans the links. Organize with headers (MEDIA: / POLITICIANS: / GROUPS: / GOVERNMENT:) and each link below a header is auto-categorized.</div>
-                    <textarea className="input" style={{ minHeight: 180, resize: "none", flex: 1 }} value={urls} onChange={(e) => setUrls(e.target.value)} />
-                    {isAdmin && (<button className="btn btn-primary" style={{ width: "100%" }} disabled={busy} onClick={collect}>{busy ? "COLLECTING…" : "Add sources & collect"}</button>)}
-{isAdmin && (
-                    <button className="btn btn-quiet" style={{ width: "100%", marginTop: 6 }} disabled={busy} onClick={async () => {
-                      setBusy(true); setError(null); setMsg(null);
-                      try {
-                        const r = await call(`/projects/${id}/scan-pages`, "POST");
-                        if (r.error) setError(`Page scan: ${r.error}`);
-                        else setMsg(r.note || "Page scan started — the result lands in the ops feed in a few minutes.");
-                      } catch (e: any) { setError(e.message || "Page scan failed."); }
-                      finally { setBusy(false); }
-                    }}>SCAN PAGES (profiles · followers · categories)</button>)}
-                  </div>
-                </div>
-              </div>
-              {/* Row 5 — market scout (roster tools live below the read) */}
-              <div className="ops-stack">
-                <div className="panel" style={{ flex: 1 }}>
-                  <div className="panel-head"><NetworkIcon />Market scout</div>
-                  <div className="panel-body" style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-                    {isAdmin && (<button className="btn btn-primary" style={{ width: "100%" }} disabled={scouting} onClick={scout}>{scouting ? "SCOUTING…" : "Scout the market"}</button>)}
-                    <div className="muted" style={{ fontSize: 11 }}>Runs daily · auto-adds pages &amp; hashtags · budget-guarded.</div>
-                    {opsEvents.length > 0 && (
-                      <div>
-                        <div className="stat-label">Ops feed</div>
-                        <div style={{ background: "var(--void)", border: "1px solid var(--carbon)", padding: "8px 10px", display: "flex", flexDirection: "column", gap: 4 }}>
-                          {opsEvents.slice(0, 3).map((e: any, i: number) => (
-                            <div key={i} className="muted" style={{ ...MONO, fontSize: 10 }}>{e.ts.slice(5, 16).replace("T", " ")} · {e.kind}: {e.detail}</div>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-                    {(disc.pages || []).length > 0 && (
-                      <div style={{ marginBottom: 10 }}>
-                        <div className="muted" style={{ fontSize: 11, marginBottom: 5, letterSpacing: ".04em" }}>SCOUT PROPOSES — pages mentioned often enough to matter. Nothing joins the roster without your word.</div>
-                        {(disc.pages || []).slice(0, 6).map((p: any) => (
-                          <div key={p.ref} style={{ display: "flex", alignItems: "center", gap: 8, padding: "6px 0", borderBottom: "1px solid var(--rowline)" }}>
-                            <span style={{ fontSize: 12, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flex: 1 }}><Ext href={p.ref}>{String(p.ref).replace("https://www.facebook.com/", "").replace("https://facebook.com/", "")} ↗</Ext></span>
-                            <span style={{ ...MONO, fontSize: 10, color: "var(--amber)" }}>·{p.co_count}</span>
-                            {p.locality === 1 && <span style={{ ...MONO, fontSize: 9, color: "var(--green, #3FA36B)", flexShrink: 0 }}>ST. LUCIA</span>}
-                            {p.locality === 3 && <span style={{ ...MONO, fontSize: 9, color: "var(--danger)", flexShrink: 0 }} title={p.service_area || ""}>ELSEWHERE</span>}
-                            {p.category && <span className="muted" style={{ ...MONO, fontSize: 9, flexShrink: 0 }}>{p.category}</span>}
-{isAdmin && (<>                            <button className="btn btn-quiet" style={{ fontSize: 10, padding: "2px 8px" }} onClick={() => scoutDecide(p.ref, "approve")}>APPROVE</button>
-                            <button style={{ border: "1px solid var(--carbon)", background: "transparent", color: "var(--danger)", cursor: "pointer", fontSize: 10, padding: "2px 8px", borderRadius: 0 }} onClick={() => scoutDecide(p.ref, "reject")}>REJECT</button></>)}
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                    {disc.topics.length > 0 && (
-                      <div>
-                        <div className="stat-label">Hashtags</div>
-                        <div className="row" style={{ gap: 6, flexWrap: "wrap" }}>{disc.topics.slice(0, 8).map((t: any) => <span key={t.ref} className="chip">#{t.ref} <span style={{ color: "var(--amber)" }}>·{t.co_count}</span></span>)}</div>
-                      </div>
-                    )}
-                    {disc.domains.length > 0 && (
-                      <div>
-                        <div className="stat-label">Sources</div>
-                        <div className="row" style={{ gap: 6, flexWrap: "wrap" }}>{disc.domains.slice(0, 6).map((d: any) => <span key={d.ref} className="chip" style={{ color: "#6E8FB0" }}>{d.ref} ·{d.co_count}</span>)}</div>
-                      </div>
-                    )}
-                  </div>
-                </div>
               </div>
 
         <div className="panel" style={{ marginTop: 14 }}>
@@ -1108,8 +951,7 @@ export default function ProjectDetailPage() {
               </span>
               {isAdmin && <button className="btn btn-quiet" style={{ fontSize: 11 }} disabled={stitchBusy} onClick={() => runStitch(false)}>DRY RUN</button>}
               {isAdmin && <button className="btn" style={{ fontSize: 11, marginLeft: 6 }} disabled={stitchBusy} onClick={() => runStitch(true)}>COMMIT</button>}
-              {isAdmin && <button style={{ fontSize: 11, marginLeft: 6, border: "1px solid var(--carbon)", background: "transparent", color: "var(--danger)", cursor: "pointer", padding: "4px 10px" }} disabled={stitchBusy} onClick={resetNarratives}>RESET</button>}
-              {isAdmin && <button className="btn btn-quiet" style={{ fontSize: 11, marginLeft: 6 }} onClick={seedGazetteer}>LOAD GAZETTEER</button>}
+
             </span>
           </div>
           <div className="panel-body">
@@ -1156,6 +998,192 @@ export default function ProjectDetailPage() {
 
             </>
           )}
+
+        {view === "setup" && (
+          <div className="ops-stack" style={{ flexDirection: "column", gap: 14 }}>
+            <div className="muted" style={{ fontSize: 11, fontFamily: "var(--font-mono)" }}>
+              Configuration — the roster, the factions, the gazetteer. Set once; the read stays clean.
+            </div>
+            <div className="panel">
+              <div className="panel-head"><NetworkIcon />Narrative machinery</div>
+              <div className="panel-body" style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+                  {isAdmin && <button className="btn btn-quiet" style={{ fontSize: 11 }} onClick={seedGazetteer}>LOAD GAZETTEER</button>}
+                  {isAdmin && <button style={{ fontSize: 11, border: "1px solid var(--carbon)", background: "transparent", color: "var(--danger)", cursor: "pointer", padding: "4px 10px" }} disabled={stitchBusy} onClick={resetNarratives}>RESET NARRATIVES</button>}
+                </div>
+                {(() => {
+                  const anchors = (project?.anchors || []) as any[];
+                  const unset = anchors.filter((a: any) => !a.faction).length;
+                  if (!anchors.length) return null;
+                  return (
+                    <div className="muted" style={{ ...MONO, fontSize: 11, color: unset ? "var(--amber)" : "var(--muted)" }}>
+                      {unset === 0
+                        ? `All ${anchors.length} sources have a faction \u2014 penetration is computed for every narrative.`
+                        : `${unset} of ${anchors.length} sources have NO faction set \u2014 any narrative they carry reports penetration as \u2014 (unknown, never guessed). Set them in Sources below.`}
+                    </div>
+                  );
+                })()}
+              </div>
+            </div>
+                  <div className="panel" style={{ flex: 22 }}>
+                    <div className="panel-head"><NetworkIcon />Sources
+                      <span className="ph-right">
+                        {isAdmin && (
+                          <button className="btn" style={{ fontSize: 9, padding: "4px 10px", marginRight: 6 }}
+                            disabled={dedupBusy}
+                            onClick={() => { if (dedup) setDedup(null); else loadDedup(); }}>
+                            {dedupBusy ? "SCANNING…" : dedup ? "CLOSE" : "HOUSEKEEP"}
+                          </button>
+                        )}
+                        <button className="btn" style={{ fontSize: 9, padding: "4px 10px" }}
+                          onClick={() => {
+                            const d: Record<string, string> = {};
+                            (project?.anchors || []).forEach((a: any) => { d[a.id] = a.kind || "other"; });
+                            setKindDraft(d);
+                            setCatEdit(!catEdit);
+                          }}>
+                          {catEdit ? "CLOSE" : "CATEGORIZE"}
+                        </button>
+                      </span>
+                    </div>
+                    <div className="panel-body" style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                      {dedup && (
+                        <div style={{ border: "1px solid var(--carbon)", background: "var(--void)", padding: 10, maxHeight: 320, overflowY: "auto" }}>
+                          <div className="stat-label" style={{ marginBottom: 8 }}>Housekeeping — duplicates &amp; dead sources</div>
+                          {(dedup.cosmetic?.length || 0) > 0 && (
+                            <div style={{ marginBottom: 10, paddingBottom: 8, borderBottom: "1px solid var(--rowline)" }}>
+                              <div style={{ fontSize: 10, color: "var(--text-2)", marginBottom: 6 }}>
+                                {dedup.cosmetic.reduce((n: number, g: any) => n + g.merge.length, 0)} cosmetic URL variant(s) of existing sources (http/www/slash only) — safe to merge automatically.
+                              </div>
+                              {dedup.cosmetic.map((g: any, i: number) => (
+                                <div key={i} style={{ fontFamily: "var(--font-mono)", fontSize: 9, color: "var(--text-2)", padding: "2px 0" }}>
+                                  {g.merge.map((m: any) => m.public_ref).join(", ")} → <span style={{ color: "var(--amber, #C2A34F)" }}>{g.keep.public_ref}</span>
+                                </div>
+                              ))}
+                              <button className="btn btn-primary" style={{ marginTop: 6, fontSize: 9, padding: "4px 10px" }} disabled={dedupBusy} onClick={dedupBackfill}>Auto-merge variants</button>
+                            </div>
+                          )}
+                          {(dedup.proposals?.length || 0) === 0 && (dedup.cosmetic?.length || 0) === 0 && (
+                            <div className="muted" style={{ fontSize: 11 }}>Roster is clean — no duplicates or dead sources found.</div>
+                          )}
+                          {(dedup.proposals || []).map((g: any, i: number) => (
+                            <div key={i} style={{ padding: "6px 0", borderBottom: "1px solid var(--rowline)" }}>
+                              <div style={{ fontSize: 10, marginBottom: 4 }}>
+                                <span style={{ color: g.kind === "dead" ? "var(--danger)" : "var(--amber, #C2A34F)", fontWeight: 600, textTransform: "uppercase", fontSize: 9 }}>{g.kind}</span>
+                                <span className="muted" style={{ marginLeft: 8, fontSize: 10 }}>{g.reason}</span>
+                              </div>
+                              {g.anchors.map((a: any) => (
+                                <div key={a.id} style={{ display: "flex", alignItems: "center", gap: 8, padding: "3px 0" }}>
+                                  <span style={{ fontFamily: "var(--font-mono)", fontSize: 9, flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", color: a.id === g.suggested_keep ? "var(--amber, #C2A34F)" : "var(--text-2)" }}
+                                    title={a.public_ref}>
+                                    {(a.public_ref || a.label || "").replace("https://www.facebook.com/", "fb/").replace("https://", "")}
+                                    <span className="muted"> · {a.items} item{a.items === 1 ? "" : "s"}{a.id === g.suggested_keep ? " · suggested keep" : ""}</span>
+                                  </span>
+                                  <button className="btn" style={{ fontSize: 8, padding: "2px 8px" }} disabled={dedupBusy}
+                                    onClick={() => dedupDecide([], [a.id])}>KEEP</button>
+                                  <button style={{ border: "1px solid var(--carbon)", background: "transparent", color: "var(--danger)", cursor: "pointer", fontSize: 8, padding: "2px 8px" }} disabled={dedupBusy}
+                                    onClick={() => dedupDecide([a.id], [], a.public_ref || a.label)}>ELIMINATE</button>
+                                </div>
+                              ))}
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                      {catEdit && (
+                        <div style={{ border: "1px solid var(--carbon)", background: "var(--void)", padding: 10, maxHeight: 260, overflowY: "auto" }}>
+                          <div className="stat-label" style={{ marginBottom: 8 }}>Assign each source a category</div>
+                          {(project?.anchors || []).map((a: any) => (
+                            <div key={a.id} style={{ display: "flex", alignItems: "center", gap: 8, padding: "4px 0", borderBottom: "1px solid var(--rowline)" }}>
+                              <span style={{ fontFamily: "var(--font-mono)", fontSize: 10, color: "var(--text-2)", flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                                {(a.public_ref || a.label || "").replace("https://www.facebook.com/", "fb/").replace("https://", "")}
+                              </span>
+                              {(a.page_category || a.service_area) && (
+                                <span className="muted" style={{ ...MONO, fontSize: 9, flexShrink: 0, maxWidth: 150, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={`${a.page_category || ""}${a.service_area ? " · " + a.service_area : ""}`}>
+                                  {a.page_category || "?"}{a.service_area ? ` · ${a.service_area}` : ""}
+                                </span>
+                              )}
+                              <select className="select" style={{ width: 110, fontSize: 10, padding: "3px 6px" }}
+                                value={kindDraft[a.id] ?? (a.kind || "other")}
+                                onChange={(e) => setKindDraft((cur) => ({ ...cur, [a.id]: e.target.value }))}>
+                                {["media", "group", "politician", "government", "institution", "other"].map((k) => <option key={k} value={k}>{k}</option>)}
+                              </select>
+                              <select className="select" title="Faction — YOUR judgment, never the machine&apos;s. state = the government machinery (ministries, police). coalition = the governing political side (SLP, ministers, incl. the independents in cabinet). Penetration measures how far a narrative escapes its own BLOC — a ministry post landing only on party pages has NOT spread."
+                                style={{ width: 108, fontSize: 10, padding: "3px 6px" }}
+                                value={factionDraft[a.id] ?? (a.faction || "unknown")}
+                                onChange={(e) => setFactionDraft((cur) => ({ ...cur, [a.id]: e.target.value }))}>
+                                {["unknown", "state", "coalition", "opposition", "media", "civil", "neutral"].map((f) => <option key={f} value={f}>{f}</option>)}
+                              </select>
+                              {isAdmin && <button title="Remove this source" onClick={() => deleteSource(a.id, a.public_ref || a.label)}
+                                style={{ border: "1px solid var(--carbon)", background: "transparent", color: "var(--danger)", cursor: "pointer", fontSize: 11, padding: "2px 7px", borderRadius: 0, flexShrink: 0 }}>×</button>}
+                            </div>
+                          ))}
+                          <button className="btn btn-primary" style={{ marginTop: 10 }} onClick={saveKinds}>Save categories</button>
+                        </div>
+                      )}
+                      <div className="muted" style={{ fontSize: 11 }}>Paste anything — the app extracts and cleans the links. Organize with headers (MEDIA: / POLITICIANS: / GROUPS: / GOVERNMENT:) and each link below a header is auto-categorized.</div>
+                      <textarea className="input" style={{ minHeight: 180, resize: "none", flex: 1 }} value={urls} onChange={(e) => setUrls(e.target.value)} />
+                      {isAdmin && (<button className="btn btn-primary" style={{ width: "100%" }} disabled={busy} onClick={collect}>{busy ? "COLLECTING…" : "Add sources & collect"}</button>)}
+  {isAdmin && (
+                      <button className="btn btn-quiet" style={{ width: "100%", marginTop: 6 }} disabled={busy} onClick={async () => {
+                        setBusy(true); setError(null); setMsg(null);
+                        try {
+                          const r = await call(`/projects/${id}/scan-pages`, "POST");
+                          if (r.error) setError(`Page scan: ${r.error}`);
+                          else setMsg(r.note || "Page scan started — the result lands in the ops feed in a few minutes.");
+                        } catch (e: any) { setError(e.message || "Page scan failed."); }
+                        finally { setBusy(false); }
+                      }}>SCAN PAGES (profiles · followers · categories)</button>)}
+                    </div>
+                  </div>
+                <div className="ops-stack">
+                  <div className="panel" style={{ flex: 1 }}>
+                    <div className="panel-head"><NetworkIcon />Market scout</div>
+                    <div className="panel-body" style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+                      {isAdmin && (<button className="btn btn-primary" style={{ width: "100%" }} disabled={scouting} onClick={scout}>{scouting ? "SCOUTING…" : "Scout the market"}</button>)}
+                      <div className="muted" style={{ fontSize: 11 }}>Runs daily · auto-adds pages &amp; hashtags · budget-guarded.</div>
+                      {opsEvents.length > 0 && (
+                        <div>
+                          <div className="stat-label">Ops feed</div>
+                          <div style={{ background: "var(--void)", border: "1px solid var(--carbon)", padding: "8px 10px", display: "flex", flexDirection: "column", gap: 4 }}>
+                            {opsEvents.slice(0, 3).map((e: any, i: number) => (
+                              <div key={i} className="muted" style={{ ...MONO, fontSize: 10 }}>{e.ts.slice(5, 16).replace("T", " ")} · {e.kind}: {e.detail}</div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                      {(disc.pages || []).length > 0 && (
+                        <div style={{ marginBottom: 10 }}>
+                          <div className="muted" style={{ fontSize: 11, marginBottom: 5, letterSpacing: ".04em" }}>SCOUT PROPOSES — pages mentioned often enough to matter. Nothing joins the roster without your word.</div>
+                          {(disc.pages || []).slice(0, 6).map((p: any) => (
+                            <div key={p.ref} style={{ display: "flex", alignItems: "center", gap: 8, padding: "6px 0", borderBottom: "1px solid var(--rowline)" }}>
+                              <span style={{ fontSize: 12, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flex: 1 }}><Ext href={p.ref}>{String(p.ref).replace("https://www.facebook.com/", "").replace("https://facebook.com/", "")} ↗</Ext></span>
+                              <span style={{ ...MONO, fontSize: 10, color: "var(--amber)" }}>·{p.co_count}</span>
+                              {p.locality === 1 && <span style={{ ...MONO, fontSize: 9, color: "var(--green, #3FA36B)", flexShrink: 0 }}>ST. LUCIA</span>}
+                              {p.locality === 3 && <span style={{ ...MONO, fontSize: 9, color: "var(--danger)", flexShrink: 0 }} title={p.service_area || ""}>ELSEWHERE</span>}
+                              {p.category && <span className="muted" style={{ ...MONO, fontSize: 9, flexShrink: 0 }}>{p.category}</span>}
+  {isAdmin && (<>                            <button className="btn btn-quiet" style={{ fontSize: 10, padding: "2px 8px" }} onClick={() => scoutDecide(p.ref, "approve")}>APPROVE</button>
+                              <button style={{ border: "1px solid var(--carbon)", background: "transparent", color: "var(--danger)", cursor: "pointer", fontSize: 10, padding: "2px 8px", borderRadius: 0 }} onClick={() => scoutDecide(p.ref, "reject")}>REJECT</button></>)}
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                      {disc.topics.length > 0 && (
+                        <div>
+                          <div className="stat-label">Hashtags</div>
+                          <div className="row" style={{ gap: 6, flexWrap: "wrap" }}>{disc.topics.slice(0, 8).map((t: any) => <span key={t.ref} className="chip">#{t.ref} <span style={{ color: "var(--amber)" }}>·{t.co_count}</span></span>)}</div>
+                        </div>
+                      )}
+                      {disc.domains.length > 0 && (
+                        <div>
+                          <div className="stat-label">Sources</div>
+                          <div className="row" style={{ gap: 6, flexWrap: "wrap" }}>{disc.domains.slice(0, 6).map((d: any) => <span key={d.ref} className="chip" style={{ color: "#6E8FB0" }}>{d.ref} ·{d.co_count}</span>)}</div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+          </div>
+        )}
         </div>
 
         {teamOpen && (
