@@ -140,7 +140,7 @@ export default function ProjectDetailPage() {
     try {
       const r = await call(`/projects/${id}/narratives/stitch?dry_run=${commit ? "false" : "true"}`, "POST");
       setMsg(r.note || (commit ? "Stitch committed." : "Dry run started — see the ops feed."));
-      setTimeout(loadMeta, 2500);
+      setTimeout(() => { loadMeta(); loadNarratives(); }, 2500);
     } catch (e: any) { setError(e.message || "Couldn’t start the stitch pass."); }
     finally { setStitchBusy(false); }
   }
@@ -190,6 +190,7 @@ export default function ProjectDetailPage() {
   const [dedup, setDedup] = useState<any>(null);        // null = strip closed
   const [dedupBusy, setDedupBusy] = useState(false);
   const [stitchBusy, setStitchBusy] = useState(false);
+  const [narratives, setNarratives] = useState<any[]>([]);
   const [factionDraft, setFactionDraft] = useState<Record<string, string>>({});
   const [msg, setMsg] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -231,6 +232,7 @@ export default function ProjectDetailPage() {
       setDisc({ topics: d.topics || [], domains: d.domains || [], pages: d.pages || [] });
       setVelo(v);
       setOpsEvents(o.events || []);
+      loadNarratives();
     } catch { setError("Couldn't load this project."); }
   }, [id]);
 
@@ -352,6 +354,14 @@ export default function ProjectDetailPage() {
       await loadMeta();
     } catch (e: any) { setError(e.message || "Couldn't save categories."); }
   }
+
+  const loadNarratives = useCallback(async () => {
+    if (!idValid) return;
+    try {
+      const r = await call(`/projects/${id}/narratives`, "GET");
+      setNarratives(r.narratives || []);
+    } catch { setNarratives([]); }
+  }, [id, idValid]);
 
   async function seedGazetteer() {
     if (!idValid) return;
@@ -1103,9 +1113,44 @@ export default function ProjectDetailPage() {
             </span>
           </div>
           <div className="panel-body">
-            <div className="muted" style={{ fontSize: 12, fontFamily: "var(--font-mono)" }}>
-              {stitchBusy ? "Stitch pass running — decisions land in the ops feed below." : "Run DRY RUN first; read the merge/split decisions in the ops feed; COMMIT only once they look right."}
+            <div className="muted" style={{ fontSize: 11, fontFamily: "var(--font-mono)", marginBottom: 10 }}>
+              {stitchBusy ? "Stitch pass running — decisions land in the ops feed below."
+                : narratives.length ? `${narratives.length} durable narratives · PENETRATION = share of engagement that landed OUTSIDE the bloc the story started in`
+                : "No narratives yet — run DRY RUN, read the decisions in the ops feed, then COMMIT."}
             </div>
+            {narratives.length > 0 && (
+              <div>
+                {[...narratives].sort((a: any, b: any) => (b.engagement || 0) - (a.engagement || 0)).slice(0, 25).map((n: any) => {
+                  const days = n.history || [];
+                  const pages = days.reduce((m: number, d: any) => Math.max(m, d.pages || 0), 0);
+                  const origin = [...days].reverse().find((d: any) => d.origin_faction)?.origin_faction || null;
+                  const pen = n.penetration;
+                  const pct = pen === null || pen === undefined ? null : Math.round(pen * 100);
+                  const hue = pct === null ? "var(--muted)" : pct >= 50 ? "var(--danger)" : pct >= 20 ? "var(--amber)" : "#427A5B";
+                  return (
+                    <div key={n.narrative_id} style={{ padding: "8px 0", borderBottom: "1px solid var(--rowline)" }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+                        <span style={{ flex: 1, minWidth: 190, fontSize: 13 }}>{n.label || "untitled"}</span>
+                        <span style={{ ...MONO, fontSize: 10, color: "var(--muted)" }}>
+                          {n.posts}p · {pages}pg · {(n.engagement || 0).toLocaleString()} eng · {n.days}d
+                        </span>
+                        {origin && <span className="chip" style={{ fontSize: 9 }}>{origin}</span>}
+                        <span style={{ ...MONO, fontSize: 11, color: hue, width: 44, textAlign: "right" }}>
+                          {pct === null ? "—" : `${pct}%`}
+                        </span>
+                        <span style={{ width: 70, height: 5, background: "var(--rowline)", flexShrink: 0 }}>
+                          {pct !== null && <span style={{ display: "block", height: 5, width: `${Math.min(100, pct)}%`, background: hue }} />}
+                        </span>
+                      </div>
+                    </div>
+                  );
+                })}
+                <div className="muted" style={{ fontSize: 10, marginTop: 8, fontFamily: "var(--font-mono)" }}>
+                  &mdash; = faction not set on the carrier pages, so penetration is unknown (never guessed).
+                  Low % = the story never left its own bloc.
+                </div>
+              </div>
+            )}
           </div>
         </div>
 
