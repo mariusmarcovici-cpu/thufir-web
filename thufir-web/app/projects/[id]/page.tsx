@@ -190,6 +190,7 @@ export default function ProjectDetailPage() {
   const [dedup, setDedup] = useState<any>(null);        // null = strip closed
   const [dedupBusy, setDedupBusy] = useState(false);
   const [stitchBusy, setStitchBusy] = useState(false);
+  const [factionDraft, setFactionDraft] = useState<Record<string, string>>({});
   const [msg, setMsg] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [picked, setPicked] = useState<Set<string>>(new Set());
@@ -343,10 +344,23 @@ export default function ProjectDetailPage() {
     if (!idValid) return;
     try {
       await call(`/projects/${id}/anchor-kinds`, "PUT", { kinds: kindDraft });
+      if (Object.keys(factionDraft).length) {
+        await call(`/projects/${id}/anchor-factions`, "PUT", { factions: factionDraft });
+      }
       setCatEdit(false);
-      setMsg("Source categories saved.");
+      setMsg("Source categories and factions saved.");
       await loadMeta();
     } catch (e: any) { setError(e.message || "Couldn't save categories."); }
+  }
+
+  async function seedGazetteer() {
+    if (!idValid) return;
+    setError(null); setMsg(null);
+    try {
+      const r = await call(`/projects/${id}/gazetteer/seed`, "POST");
+      setMsg(`Gazetteer loaded \u2014 ${r.seeded} entries (public figures, communities, organisations).`);
+      setTimeout(loadMeta, 1200);
+    } catch (e: any) { setError(e.message || "Couldn't load the gazetteer."); }
   }
 
   async function saveRoster() {
@@ -998,6 +1012,12 @@ export default function ProjectDetailPage() {
                               onChange={(e) => setKindDraft((cur) => ({ ...cur, [a.id]: e.target.value }))}>
                               {["media", "group", "politician", "government", "institution", "other"].map((k) => <option key={k} value={k}>{k}</option>)}
                             </select>
+                            <select className="select" title="Faction — YOUR judgment. Penetration measures how far a narrative travels OUTSIDE the faction it started in. Never inferred by the machine."
+                              style={{ width: 108, fontSize: 10, padding: "3px 6px" }}
+                              value={factionDraft[a.id] ?? (a.faction || "unknown")}
+                              onChange={(e) => setFactionDraft((cur) => ({ ...cur, [a.id]: e.target.value }))}>
+                              {["unknown", "government", "opposition", "media", "neutral"].map((f) => <option key={f} value={f}>{f}</option>)}
+                            </select>
                             {isAdmin && <button title="Remove this source" onClick={() => deleteSource(a.id, a.public_ref || a.label)}
                               style={{ border: "1px solid var(--carbon)", background: "transparent", color: "var(--danger)", cursor: "pointer", fontSize: 11, padding: "2px 7px", borderRadius: 0, flexShrink: 0 }}>×</button>}
                           </div>
@@ -1079,6 +1099,7 @@ export default function ProjectDetailPage() {
               {isAdmin && <button className="btn btn-quiet" style={{ fontSize: 11 }} disabled={stitchBusy} onClick={() => runStitch(false)}>DRY RUN</button>}
               {isAdmin && <button className="btn" style={{ fontSize: 11, marginLeft: 6 }} disabled={stitchBusy} onClick={() => runStitch(true)}>COMMIT</button>}
               {isAdmin && <button style={{ fontSize: 11, marginLeft: 6, border: "1px solid var(--carbon)", background: "transparent", color: "var(--danger)", cursor: "pointer", padding: "4px 10px" }} disabled={stitchBusy} onClick={resetNarratives}>RESET</button>}
+              {isAdmin && <button className="btn btn-quiet" style={{ fontSize: 11, marginLeft: 6 }} onClick={seedGazetteer}>LOAD GAZETTEER</button>}
             </span>
           </div>
           <div className="panel-body">
