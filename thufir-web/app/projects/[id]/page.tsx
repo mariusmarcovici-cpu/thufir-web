@@ -58,7 +58,7 @@ function packBubbles(items: { r: number }[], W: number, H: number) {
 }
 
 function WordBubbles({ topics, onPick }: { topics: any[]; onPick?: (id: string) => void }) {
-  const W = 860, H = 520;
+  const W = 1280, H = 400;
   const items = topics.slice(0, 24).map((t: any) => ({
     id: t.topic_cluster_id,
     word: String(t.label || "").split(/[\/·]| - /)[0].trim().split(" ").slice(0, 2).join(" ") || "topic",
@@ -66,11 +66,15 @@ function WordBubbles({ topics, onPick }: { topics: any[]; onPick?: (id: string) 
     mood: t.mood || "neutral", category: t.category,
   }));
   const maxE = Math.max(1, ...items.map((i) => i.eng));
-  const sized = items.map((i) => ({ ...i, r: 24 + 52 * Math.sqrt(i.eng / maxE) }))
+  let sized = items.map((i) => ({ ...i, r: 22 + 46 * Math.sqrt(i.eng / maxE) }))
     .sort((a, b) => b.r - a.r);
-  const pos = packBubbles(sized, W, H);
+  let pos = packBubbles(sized, W, H);
+  for (let shrink = 0.9; shrink >= 0.6 && pos.some((p) => p.r === 0); shrink -= 0.1) {
+    sized = sized.map((b) => ({ ...b, r: Math.max(16, b.r * shrink) }));
+    pos = packBubbles(sized, W, H);
+  }
   return (
-    <svg viewBox={`0 0 ${W} ${H}`} style={{ width: "100%", height: "auto", display: "block" }}>
+    <svg viewBox={`0 0 ${W} ${H}`} style={{ width: "100%", height: "auto", maxHeight: "55vh", display: "block", margin: "0 auto" }}>
       {sized.map((b, i) => pos[i].r > 0 && (
         <g key={i} onClick={() => b.id && onPick?.(b.id)} style={{ cursor: onPick ? "pointer" : "default" }}>
           <title>{b.full} — {b.n} posts · {b.eng.toLocaleString()} engagement · {b.mood}</title>
