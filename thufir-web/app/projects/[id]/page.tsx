@@ -135,12 +135,25 @@ export default function ProjectDetailPage() {
   }
   async function runStitch(commit: boolean) {
     if (!idValid) return;
+    if (commit && !window.confirm("COMMIT writes narratives to the database. Run a DRY RUN first and read the decisions in the ops feed. Commit now?")) return;
     setStitchBusy(true); setError(null); setMsg(null);
     try {
       const r = await call(`/projects/${id}/narratives/stitch?dry_run=${commit ? "false" : "true"}`, "POST");
       setMsg(r.note || (commit ? "Stitch committed." : "Dry run started — see the ops feed."));
       setTimeout(loadMeta, 2500);
     } catch (e: any) { setError(e.message || "Couldn’t start the stitch pass."); }
+    finally { setStitchBusy(false); }
+  }
+
+  async function resetNarratives() {
+    if (!idValid) return;
+    if (!window.confirm("RESET deletes every narrative for this project so the spine can be rebuilt clean. Continue?")) return;
+    setStitchBusy(true); setError(null); setMsg(null);
+    try {
+      const r = await call(`/projects/${id}/narratives/reset`, "POST");
+      setMsg(`Spine reset — cleared. Run a DRY RUN, read it, then COMMIT.`);
+      setTimeout(loadMeta, 1500);
+    } catch (e: any) { setError(e.message || "Reset failed."); }
     finally { setStitchBusy(false); }
   }
   const [disc, setDisc] = useState<any>({ topics: [], domains: [], pages: [] });
@@ -1065,6 +1078,7 @@ export default function ProjectDetailPage() {
               </span>
               {isAdmin && <button className="btn btn-quiet" style={{ fontSize: 11 }} disabled={stitchBusy} onClick={() => runStitch(false)}>DRY RUN</button>}
               {isAdmin && <button className="btn" style={{ fontSize: 11, marginLeft: 6 }} disabled={stitchBusy} onClick={() => runStitch(true)}>COMMIT</button>}
+              {isAdmin && <button style={{ fontSize: 11, marginLeft: 6, border: "1px solid var(--carbon)", background: "transparent", color: "var(--danger)", cursor: "pointer", padding: "4px 10px" }} disabled={stitchBusy} onClick={resetNarratives}>RESET</button>}
             </span>
           </div>
           <div className="panel-body">
