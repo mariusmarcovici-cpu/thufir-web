@@ -130,16 +130,18 @@ export default function ProjectDetailPage() {
   const [coord, setCoord] = useState<any>(null);
   async function loadCoord() {
     if (!idValid) return;
-    const c = await call(`/projects/${id}/coordination`, "GET").catch(() => null);
+    const c = null;  // coordination retired 12-Jul (premise rejected)
     if (c) setCoord(c);
   }
-  async function runCoord() {
+  async function runStitch(commit: boolean) {
     if (!idValid) return;
-    setError(null); setMsg(null);
+    setStitchBusy(true); setError(null); setMsg(null);
     try {
-      const r = await call(`/projects/${id}/coordination/run`, "POST");
-      setMsg(r.note || "Coordination pass started — result lands in the ops feed.");
-    } catch (e: any) { setError(e.message || "Couldn't start the coordination pass."); }
+      const r = await call(`/projects/${id}/narratives/stitch?dry_run=${commit ? "false" : "true"}`, "POST");
+      setMsg(r.note || (commit ? "Stitch committed." : "Dry run started — see the ops feed."));
+      setTimeout(loadMeta, 2500);
+    } catch (e: any) { setError(e.message || "Couldn’t start the stitch pass."); }
+    finally { setStitchBusy(false); }
   }
   const [disc, setDisc] = useState<any>({ topics: [], domains: [], pages: [] });
   const [velo, setVelo] = useState<any>(null);
@@ -174,6 +176,7 @@ export default function ProjectDetailPage() {
   const [urls, setUrls] = useState("https://stluciatimes.com/feed/\n");
   const [dedup, setDedup] = useState<any>(null);        // null = strip closed
   const [dedupBusy, setDedupBusy] = useState(false);
+  const [stitchBusy, setStitchBusy] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [picked, setPicked] = useState<Set<string>>(new Set());
@@ -1055,55 +1058,19 @@ export default function ProjectDetailPage() {
               </div>
 
         <div className="panel" style={{ marginTop: 14 }}>
-          <div className="panel-head"><NetworkIcon />Coordination
+          <div className="panel-head"><NetworkIcon />Narratives
             <span className="ph-right">
-              <span className="muted" style={{ fontSize: 10, fontFamily: "var(--font)", letterSpacing: 0, marginRight: 8 }}>
-                similar residual text across different pages in a tight time bracket — a signal to investigate, not a verdict
+              <span className="muted" style={{ fontSize: 10, letterSpacing: 0, marginRight: 8 }}>
+                stitch clusters into durable narratives — dry run reports to the ops feed and writes nothing
               </span>
-              {isAdmin && <button className="btn btn-quiet" style={{ fontSize: 11 }} onClick={runCoord}>RUN PASS</button>}
+              {isAdmin && <button className="btn btn-quiet" style={{ fontSize: 11 }} disabled={stitchBusy} onClick={() => runStitch(false)}>DRY RUN</button>}
+              {isAdmin && <button className="btn" style={{ fontSize: 11, marginLeft: 6 }} disabled={stitchBusy} onClick={() => runStitch(true)}>COMMIT</button>}
             </span>
           </div>
           <div className="panel-body">
-            {!coord && <div className="muted" style={{ fontSize: 12, fontFamily: "var(--font-mono)" }}>No coordination pass yet{isAdmin ? " — click RUN PASS." : "."}</div>}
-            {coord && (coord.events?.length || 0) === 0 && (coord.edges?.length || 0) === 0 && (
-              <div className="muted" style={{ fontSize: 12, fontFamily: "var(--font-mono)" }}>No coordination signatures found in the current corpus.</div>
-            )}
-            {coord && (coord.events?.length || 0) > 0 && (
-              <div style={{ marginBottom: 12 }}>
-                <div className="muted" style={{ fontSize: 11, marginBottom: 6, letterSpacing: ".04em" }}>SYNCHRONIZED POSTING EVENTS — {coord.events.length}</div>
-                {coord.events.map((ev: any, i: number) => (
-                  <div key={i} style={{ padding: "9px 0", borderBottom: "1px solid var(--rowline)" }}>
-                    <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4, flexWrap: "wrap" }}>
-                      <span style={{ ...MONO, fontSize: 11, color: "var(--danger)" }}>{ev.entity_count} pages</span>
-                      <span style={{ ...MONO, fontSize: 10, color: "var(--muted)" }}>{ev.post_count} posts in {Math.round((new Date(ev.window_end).getTime() - new Date(ev.window_start).getTime()) / 60000)} min</span>
-                      <span style={{ ...MONO, fontSize: 10, color: "var(--muted)" }}>{new Date(ev.window_start).toLocaleString()}</span>
-                    </div>
-                    <div style={{ display: "flex", gap: 5, flexWrap: "wrap", marginBottom: 4 }}>
-                      {(ev.entities || []).map((e: string) => <span key={e} className="chip" style={{ fontSize: 10 }}>{e.replace("fb:", "")}</span>)}
-                    </div>
-                    <div style={{ fontSize: 12, color: "#B8BEC7", fontStyle: "italic" }}>&ldquo;{ev.sample_text}&rdquo;</div>
-                  </div>
-                ))}
-              </div>
-            )}
-            {coord && (coord.edges?.length || 0) > 0 && (
-              <div>
-                <div className="muted" style={{ fontSize: 11, marginBottom: 6, letterSpacing: ".04em" }}>
-                  SIMILARITY LADDER — top pairs across different pages (flag threshold {coord.threshold})
-                </div>
-                {coord.edges.slice(0, 12).map((e: any, i: number) => (
-                  <div key={i} style={{ display: "flex", alignItems: "center", gap: 8, padding: "6px 0", borderBottom: "1px solid var(--rowline)" }}>
-                    <span style={{ ...MONO, fontSize: 12, color: e.flagged ? "var(--danger)" : "var(--muted)", width: 46 }}>{e.similarity.toFixed(3)}</span>
-                    <span style={{ ...MONO, fontSize: 10, flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                      {e.entity_a.replace("fb:", "")} ↔ {e.entity_b.replace("fb:", "")}
-                    </span>
-                    <span style={{ ...MONO, fontSize: 9, color: "var(--muted)" }}>{e.time_delta_seconds < 3600 ? `${Math.round(e.time_delta_seconds / 60)}m` : `${Math.round(e.time_delta_seconds / 3600)}h`} apart</span>
-                    {e.url_a && <span style={{ ...MONO, fontSize: 9 }}><Ext href={e.url_a}>a</Ext></span>}
-                    {e.url_b && <span style={{ ...MONO, fontSize: 9 }}><Ext href={e.url_b}>b</Ext></span>}
-                  </div>
-                ))}
-              </div>
-            )}
+            <div className="muted" style={{ fontSize: 12, fontFamily: "var(--font-mono)" }}>
+              {stitchBusy ? "Stitch pass running — decisions land in the ops feed below." : "Run DRY RUN first; read the merge/split decisions in the ops feed; COMMIT only once they look right."}
+            </div>
           </div>
         </div>
 
