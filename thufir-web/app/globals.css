@@ -76,6 +76,21 @@ h1, h2, h3 { font-weight: 600; margin: 0; }
 label.field { display: block; font-size: 10px; font-family: var(--font-mono); letter-spacing: 1px; text-transform: uppercase; color: var(--muted); margin-bottom: 4px; }
 .input, .select { width: 100%; box-sizing: border-box; font-size: 12px; padding: 8px 10px; color: var(--text); background: var(--void); border: 1px solid var(--carbon); border-radius: 2px; font-family: var(--font-mono); }
 .input:focus, .select:focus { outline: none; border-color: var(--amber); box-shadow: 0 0 0 2px var(--accent-bg); }
+
+/* Native <select> popups are drawn by the OS, not by us. With no explicit
+   background on the options, the list falls back to system WHITE while the text
+   stays near-white (--text: #E4E7EB) — white on white, unreadable. Every dropdown
+   in the app was affected, including the faction pickers. Set both explicitly. */
+select, .select { color-scheme: dark; }
+select option, .select option {
+  background-color: var(--console);
+  color: var(--text);
+  padding: 6px 8px;
+}
+select option:checked, .select option:checked {
+  background-color: var(--carbon);
+  color: #FFFFFF;
+}
 .input::placeholder { color: var(--muted); }
 input[type="range"] { width: 100%; accent-color: var(--amber); }
 .alert { font-size: 12px; padding: 8px 12px; border-radius: 2px; border: 1px solid var(--carbon); font-family: var(--font-mono); }
