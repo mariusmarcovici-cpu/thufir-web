@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { AreaChart, Area, LineChart, Line, Legend, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
 import { useRequireAuth } from "@/lib/auth";
@@ -207,6 +207,12 @@ export default function ProjectDetailPage() {
   const [rosterDraft, setRosterDraft] = useState<Set<string>>(new Set());
   const [cat, setCat] = useState<string>("");
   const [catEdit, setCatEdit] = useState(false);
+  // Background refreshes (loadMeta) must respect what the analyst selected.
+  // Hard-coding window=month here once made the map silently swap month data
+  // under a DAY chip — the UI claimed "today" while showing three-week-old
+  // posts. Refs stay current across renders without re-creating loadMeta.
+  const topicWinRef = useRef(topicWin);
+  const catRef = useRef(cat);
   const [kindDraft, setKindDraft] = useState<Record<string, string>>({});
 
   const analyze = useCallback(async (elena = false, category = "") => {
@@ -222,13 +228,16 @@ export default function ProjectDetailPage() {
     finally { setAnalyzing(false); }
   }, [id]);
 
+  topicWinRef.current = topicWin;
+  catRef.current = cat;
+
   const loadMeta = useCallback(async () => {
     if (!id) return;
     try {
       const [p, d, v, o] = await Promise.all([
         call(`/projects/${id}`, "GET"),
         call(`/projects/${id}/discovered`, "GET").catch(() => ({ topics: [], domains: [], pages: [] })),
-        call(`/projects/${id}/topics/composed?window=month`, "GET").catch(() => null),
+        call(`/projects/${id}/topics/composed?window=${topicWinRef.current}${catRef.current ? `&category=${catRef.current}` : ""}`, "GET").catch(() => null),
         call(`/projects/${id}/ops?limit=5`, "GET").catch(() => ({ events: [] })),
       ]);
       setProject(p);
