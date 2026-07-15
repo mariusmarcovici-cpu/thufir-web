@@ -61,7 +61,7 @@ function WordBubbles({ topics, onPick }: { topics: any[]; onPick?: (id: string) 
   const W = 1280, H = 400;
   const items = topics.slice(0, 24).map((t: any) => ({
     id: t.topic_cluster_id,
-    word: String(t.label || "").split(/[\/·]| - /)[0].trim().split(" ").slice(0, 2).join(" ") || "topic",
+    word: String(t.label || "").split(/[\/·]| - /)[0].trim().split(" ").slice(0, 4).join(" ") || "topic",
     full: t.label, n: t.posts || 0, eng: t.engagement || 0,
     mood: t.mood || "neutral", category: t.category,
   }));
@@ -79,14 +79,30 @@ function WordBubbles({ topics, onPick }: { topics: any[]; onPick?: (id: string) 
         <g key={i} onClick={() => b.id && onPick?.(b.id)} style={{ cursor: onPick ? "pointer" : "default" }}>
           <title>{b.full} — {b.n} posts · {b.eng.toLocaleString()} engagement · {b.mood}</title>
           <circle cx={pos[i].x} cy={pos[i].y} r={b.r} fill={BUBBLE_FILL[b.mood] || BUBBLE_FILL.neutral} stroke={BUBBLE_STROKE[b.mood] || BUBBLE_STROKE.neutral} strokeWidth={1.5} />
-          <text x={pos[i].x} y={pos[i].y - 3} textAnchor="middle"
-            style={{ fontSize: Math.max(9, b.r / 3.4), fontWeight: 600, fill: BUBBLE_TEXT[b.mood] || "#B8BEC7" }}>
-            {b.word.length > Math.floor(b.r / 3.2) ? b.word.slice(0, Math.max(4, Math.floor(b.r / 3.2))) + "…" : b.word}
-          </text>
-          <text x={pos[i].x} y={pos[i].y + Math.max(10, b.r / 3)} textAnchor="middle"
-            style={{ fontSize: Math.max(8, b.r / 4), fill: "#8B949E", fontFamily: "var(--font-mono)" }}>
-            {b.n}
-          </text>
+          {(() => {
+            const fs = Math.max(9, b.r / 3.6);
+            const budget = Math.max(6, Math.floor((b.r * 1.7) / (fs * 0.6)));
+            const words = b.word.split(" ");
+            let l1 = "", k = 0;
+            while (k < words.length && (l1 + " " + words[k]).trim().length <= budget) { l1 = (l1 + " " + words[k]).trim(); k++; }
+            if (!l1) { l1 = words[0].slice(0, Math.max(4, budget - 1)) + "…"; k = 1; }
+            let l2 = words.slice(k).join(" ");
+            if (l2.length > budget) l2 = l2.slice(0, budget - 1) + "…";
+            const two = !!l2;
+            return (
+              <>
+                <text x={pos[i].x} y={pos[i].y - (two ? fs * 0.55 : 3)} textAnchor="middle"
+                  style={{ fontSize: fs, fontWeight: 600, fill: BUBBLE_TEXT[b.mood] || "#B8BEC7" }}>
+                  {l1}
+                  {two && <tspan x={pos[i].x} dy={fs * 1.12}>{l2}</tspan>}
+                </text>
+                <text x={pos[i].x} y={pos[i].y + (two ? fs * 2.05 : Math.max(10, b.r / 3))} textAnchor="middle"
+                  style={{ fontSize: Math.max(8, b.r / 4), fill: "#8B949E", fontFamily: "var(--font-mono)" }}>
+                  {b.n}
+                </text>
+              </>
+            );
+          })()}
         </g>
       ))}
     </svg>
