@@ -124,7 +124,7 @@ export default function ProjectDetailPage() {
   const id = params.id as string;
   const idValid = !!id && id !== "undefined" && id !== "null";
 
-  const [view, setView] = useState<"dash" | "duel" | "setup">("dash");
+  const [view, setView] = useState<"dash" | "duel" | "edition" | "setup">("dash");
   const [project, setProject] = useState<any>(null);
   const isAdmin = ["owner", "editor"].includes(project?.role || "");
   const isOwner = (project?.role || "") === "owner";
@@ -223,6 +223,8 @@ export default function ProjectDetailPage() {
   const [rosterDraft, setRosterDraft] = useState<Set<string>>(new Set());
   const [cat, setCat] = useState<string>("");
   const [catEdit, setCatEdit] = useState(false);
+  const [edition, setEdition] = useState<any>(null);   // {label, start, end, topics}
+  const [editionLoading, setEditionLoading] = useState(false);
   // Background refreshes (loadMeta) must respect what the analyst selected.
   // Hard-coding window=month here once made the map silently swap month data
   // under a DAY chip — the UI claimed "today" while showing three-week-old
@@ -371,12 +373,32 @@ export default function ProjectDetailPage() {
     } catch (e: any) { setError(e.message || "Couldn't record the decision."); }
   }
 
+  async function loadEdition() {
+    if (!idValid) return;
+    setEditionLoading(true);
+    try {
+      const v = await call(`/projects/${id}/topics/composed?window=edition`, "GET");
+      setEdition(v);
+    } catch (e: any) { setError(e.message || "Couldn't load the edition."); }
+    finally { setEditionLoading(false); }
+  }
+
   async function saveKinds() {
     if (!idValid) return;
     try {
       await call(`/projects/${id}/anchor-kinds`, "PUT", { kinds: kindDraft });
       if (Object.keys(factionDraft).length) {
-        await call(`/projects/${id}/anchor-factions`, "PUT", { factions: factionDraft });
+        try {
+          await call(`/projects/${id}/anchor-factions`, "PUT", { factions: factionDraft });
+        } catch (e: any) {
+          // the mass-null guardrail: a save clearing many set factions is
+          // usually a stale draft, not intent - make the human decide.
+          const msg = String(e.message || "");
+          if (msg.includes("would CLEAR") && window.confirm(msg + "\n\nProceed anyway?")) {
+            await call(`/projects/${id}/anchor-factions`, "PUT", { factions: factionDraft, force: true });
+          } else if (!msg.includes("would CLEAR")) { throw e; }
+          else { setMsg("Save cancelled - reload the page to refresh the categorize panel."); return; }
+        }
       }
       setCatEdit(false);
       setMsg("Source categories and factions saved.");
@@ -534,6 +556,10 @@ export default function ProjectDetailPage() {
               <div className="seg">
                 <button data-on={view === "dash"} onClick={() => setView("dash")}>DASHBOARD</button>
                 <button data-on={view === "duel"} onClick={() => setView("duel")}>HEAD-TO-HEAD</button>
+                <button data-on={view === "edition"} onClick={() => { setView("edition"); loadEdition(); }}>EDITION</button>
+              </div>
+              <span style={{ width: 14 }} />
+              <div className="seg" title="Configuration and maintenance — the technical door">
                 <button data-on={view === "setup"} onClick={() => setView("setup")}>SETUP</button>
               </div>
               <button className="btn btn-primary" disabled={analyzing} onClick={() => analyze(false)}>{analyzing ? "ANALYSING…" : "Re-analyse"}</button>
@@ -1038,6 +1064,46 @@ export default function ProjectDetailPage() {
             </>
           )}
 
+        {view === "edition" && (
+            <div className="panel" style={{ marginTop: 14 }}>
+              <div className="panel-head">
+                <span className="panel-title">{edition?.edition?.label || "EDITION"}</span>
+                <span className="muted" style={{ fontSize: 11 }}>
+                  the market&apos;s editorial day &mdash; stable until the next 8AM scan
+                </span>
+              </div>
+              <div className="panel-body" style={{ padding: 8 }}>
+                {editionLoading && <div className="muted" style={{ fontSize: 12 }}>Loading the edition&hellip;</div>}
+                {!editionLoading && edition && (() => {
+                  const tops = (edition.topics ?? []).filter((t: any) => !String(t.label || "").startsWith("(media"));
+                  const posts = tops.reduce((a: number, t: any) => a + (t.posts || 0), 0);
+                  const eng = tops.reduce((a: number, t: any) => a + (t.engagement || 0), 0);
+                  const wEng = { positive: 0, negative: 0, neutral: 0 } as any;
+                  tops.forEach((t: any) => { wEng[t.mood || "neutral"] = (wEng[t.mood || "neutral"] || 0) + (t.engagement || 0); });
+                  const mood = (Object.entries(wEng) as any[]).sort((a, b) => b[1] - a[1])[0]?.[0] || "neutral";
+                  return (
+                    <>
+                      {(() => {
+                        const num = { fontSize: 26, fontWeight: 700, fontFamily: "var(--font-mono)", color: "#E4E7EB", lineHeight: 1.1 } as any;
+                        const cap = { fontSize: 10, letterSpacing: "0.12em", color: "#8B949E", marginTop: 2 } as any;
+                        return (
+                          <div className="row" style={{ gap: 28, flexWrap: "wrap", padding: "6px 8px 14px" }}>
+                            <div><div style={num}>{posts}</div><div style={cap}>POSTS IN EDITION</div></div>
+                            <div><div style={num}>{eng.toLocaleString()}</div><div style={cap}>ENGAGEMENT</div></div>
+                            <div><div style={num}>{tops.length}</div><div style={cap}>STORIES</div></div>
+                            <div><div style={{ ...num, textTransform: "lowercase" }}>{mood}</div><div style={cap}>EDITION MOOD</div></div>
+                          </div>
+                        );
+                      })()}
+                      {tops.length > 0
+                        ? <WordBubbles topics={tops} onPick={openTopic} />
+                        : <div className="muted" style={{ fontSize: 12 }}>No posts in this edition &mdash; the window is {edition?.edition?.label}. The next edition opens at the 8AM market-local scan.</div>}
+                    </>
+                  );
+                })()}
+              </div>
+            </div>
+        )}
         {view === "setup" && (
           <div className="ops-stack" style={{ flexDirection: "column", gap: 14 }}>
             <div className="muted" style={{ fontSize: 11, fontFamily: "var(--font-mono)" }}>
