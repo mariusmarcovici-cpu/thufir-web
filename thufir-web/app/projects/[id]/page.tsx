@@ -765,7 +765,7 @@ export default function ProjectDetailPage() {
                     </span>
                   </div>
                   <div className="panel-body" style={{ padding: 8 }}>
-                    {allTopics.length > 2 ? <WordBubbles topics={allTopics} onPick={openTopic} /> : <div className="muted" style={{ fontSize: 12 }}>Run &quot;Rebuild semantic index&quot; to build the map.</div>}
+                    {allTopics.length > 0 ? <WordBubbles topics={allTopics} onPick={openTopic} /> : <div className="muted" style={{ fontSize: 12 }}>{topicWin === "day" ? "No posts in the last 24 hours yet \u2014 the map fills after the next collection run. Try WEEK or MONTH meanwhile." : "No topics in this window \u2014 run \u201cRebuild semantic index\u201d if the corpus has posts."}</div>}
                   </div>
                   <div style={{ display: "flex", gap: 18, padding: "10px 16px", borderTop: "1px solid var(--carbon)", fontFamily: "var(--font-mono)", fontSize: 10, letterSpacing: 1, color: "var(--muted)" }}>
                     <span><span style={{ display: "inline-block", width: 9, height: 9, background: "#427A5B", marginRight: 6 }} />POSITIVE</span>
