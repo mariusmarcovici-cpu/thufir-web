@@ -392,6 +392,16 @@ export default function ProjectDetailPage() {
     } catch { setNarratives([]); }
   }, [id, idValid]);
 
+  async function seedFactions() {
+    if (!idValid) return;
+    setError(null); setMsg(null);
+    try {
+      const r = await call(`/projects/${id}/anchor-factions/seed`, "POST");
+      setMsg(`Factions seeded from the gazetteer \u2014 ${r.seeded} filled, ${r.ambiguous_skipped} ambiguous skipped, ${r.human_set_untouched} human-set untouched, ${r.still_unknown} still unknown (yours to judge).`);
+      setTimeout(loadMeta, 1200);
+    } catch (e: any) { setError(e.message || "Couldn't seed factions."); }
+  }
+
   async function seedGazetteer() {
     if (!idValid) return;
     setError(null); setMsg(null);
@@ -1038,6 +1048,7 @@ export default function ProjectDetailPage() {
               <div className="panel-body" style={{ display: "flex", flexDirection: "column", gap: 10 }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
                   {isAdmin && <button className="btn btn-quiet" style={{ fontSize: 11 }} onClick={seedGazetteer}>LOAD GAZETTEER</button>}
+                  {isAdmin && <button className="btn btn-quiet" style={{ fontSize: 11 }} title="Copies YOUR gazetteer judgments onto pages that resolve to those entities. Empty slots only \u2014 a faction set by hand is never overwritten. Ambiguous matches are skipped." onClick={seedFactions}>SEED FACTIONS</button>}
                   {isAdmin && <button style={{ fontSize: 11, border: "1px solid var(--carbon)", background: "transparent", color: "var(--danger)", cursor: "pointer", padding: "4px 10px" }} disabled={stitchBusy} onClick={resetNarratives}>RESET NARRATIVES</button>}
                 </div>
                 {(() => {
