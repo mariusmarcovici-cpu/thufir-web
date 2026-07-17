@@ -402,8 +402,15 @@ export default function ProjectDetailPage() {
     if (!spFrom || !spTo) { setError("Pick both start and end."); return; }
     setSpBusy(true); setError(null); setSpFrozenMeta(null);
     try {
-      const qs = `start=${encodeURIComponent(new Date(spFrom).toISOString())}&end=${encodeURIComponent(new Date(spTo).toISOString())}`;
-      const v = await call(`/projects/${id}/editions/extract?${qs}`, "GET");
+      const qs = `start=${encodeURIComponent(mkIso(spFrom))}&end=${encodeURIComponent(mkIso(spTo))}`;
+      let v = await call(`/projects/${id}/editions/extract?${qs}`, "GET");
+      if (v.needs_scan) {
+        // ONE BUTTON: the window reaches past the last measurement, so the
+        // button runs the scan itself, then re-measures. No tab-hopping.
+        setMsg("Window extends past the last scan \u2014 scanning now (2\u20135 min)\u2026");
+        try { await collect(); v = await call(`/projects/${id}/editions/extract?${qs}`, "GET"); }
+        catch { setMsg("Scan failed \u2014 showing what the existing measurements hold."); }
+      }
       setSpReport(v);
     } catch (e: any) { setError(e.message || "Extraction failed."); }
     finally { setSpBusy(false); }
@@ -414,7 +421,7 @@ export default function ProjectDetailPage() {
     setSpBusy(true); setError(null);
     try {
       const v = await call(`/projects/${id}/editions`, "POST", {
-        start: new Date(spFrom).toISOString(), end: new Date(spTo).toISOString(),
+        start: mkIso(spFrom), end: mkIso(spTo),
         label: spLabel,
       });
       setMsg(`Edition FROZEN: ${v.label}`);
@@ -562,6 +569,15 @@ export default function ProjectDetailPage() {
   const s = ana?.summary;
   const pulse = ana?.pulse;
   const board = (ana?.leaderboards?.[lbWin] ?? ana?.leaderboard ?? []) as any[];
+  const mkOff = (() => { const m = /UTC([+-]\d+)/.exec(ana?.market_tz || ""); return m ? parseInt(m[1], 10) : -4; })();
+  const mkOffStr = `${mkOff < 0 ? "-" : "+"}${String(Math.abs(mkOff)).padStart(2, "0")}:00`;
+  const mfmt = (iso: string, opts: any = { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" }) => {
+    if (!iso) return "";
+    const d = new Date(new Date(iso).getTime() + mkOff * 3600e3);
+    return d.toLocaleString("en-GB", { ...opts, timeZone: "UTC" });
+  };
+  const mkIso = (local: string) => `${local}:00${mkOffStr}`;   // picker value IS market time
+  const anchorChip = ana?.anchor_day ? mfmt(`${ana.anchor_day}T12:00:00Z`, { day: "2-digit", month: "short" }).toUpperCase() : "LATEST DAY";
   const topPostsWindowed = (() => {
     const posts = ((ana?.top_posts || []) as any[]).filter((p) => !p.dateless);
     const days = posts.map((p) => p.day).filter(Boolean).sort();
@@ -835,7 +851,7 @@ export default function ProjectDetailPage() {
                       <span className="muted" style={{ fontSize: 11, fontFamily: "var(--font)", letterSpacing: 0, marginRight: 8 }}>click a bubble to read its posts</span>
                       <span className="seg seg-sm">
                         {(["day", "week", "month"] as const).map((w) => (
-                          <button key={w} data-on={topicWin === w} onClick={() => { setTopicWin(w); loadVelo(cat, w); }}>{w.toUpperCase()}</button>
+                          <button key={w} data-on={topicWin === w} onClick={() => { setTopicWin(w); loadVelo(cat, w); }}>{w === "day" ? "LAST 24H" : w === "week" ? "LAST 7D" : "LAST 30D"}</button>
                         ))}
                       </span>
                     </span>
@@ -879,9 +895,10 @@ export default function ProjectDetailPage() {
               <div className="ops-stack">
                 <div className="panel" style={{ flex: 58 }}>
                   <div className="panel-head"><TrendIcon />Who&apos;s winning attention
+                    {ana?.generated_at && <span className="muted" style={{ fontSize: 10, marginLeft: 10 }}>as of {mfmt(ana.generated_at)} {ana?.market_tz || ""} \u00b7 % of top 10</span>}
                     <span className="ph-right"><span className="seg seg-sm">
                       {(["day", "week", "month"] as const).map((w) => (
-                        <button key={w} data-on={lbWin === w} onClick={() => setLbWin(w)}>{w === "day" ? "TODAY" : w === "week" ? "THIS WEEK" : "THIS MONTH"}</button>
+                        <button key={w} data-on={lbWin === w} onClick={() => setLbWin(w)}>{w === "day" ? anchorChip : w === "week" ? "7 DAYS" : "30 DAYS"}</button>
                       ))}
                     </span></span>
                   </div>
@@ -895,7 +912,7 @@ export default function ProjectDetailPage() {
                             <Mood m={e.mood} />
                           </div>
                           <div style={{ ...MONO, fontSize: 10, color: "var(--muted)" }}>
-                            <span style={{ color: "var(--text-2)" }}>PAGE TOTAL, {lbWin === "day" ? "TODAY" : lbWin === "week" ? "THIS WEEK" : "THIS MONTH"}</span>
+                            <span style={{ color: "var(--text-2)" }}>PAGE TOTAL, {lbWin === "day" ? `EDITORIAL DAY ${anchorChip}` : lbWin === "week" ? "LAST 7 EDITORIAL DAYS" : "LAST 30 EDITORIAL DAYS"}</span>
                             {" · "}{e.posts ?? 0} post{(e.posts ?? 0) === 1 ? "" : "s"}
                             {" · "}{e.likes.toLocaleString()} reactions · {e.shares.toLocaleString()} shares · {e.views.toLocaleString()} views
                           </div>
@@ -1035,7 +1052,7 @@ export default function ProjectDetailPage() {
                     <span className="ph-right">
                       <span className="seg seg-sm">
                         {(["day", "week", "month"] as const).map((w) => (
-                          <button key={w} data-on={tpWin === w} onClick={() => setTpWin(w)}>{w === "day" ? "TODAY" : w === "week" ? "THIS WEEK" : "THIS MONTH"}</button>
+                          <button key={w} data-on={tpWin === w} onClick={() => setTpWin(w)}>{w === "day" ? "LAST 24H" : w === "week" ? "LAST 7D" : "LAST 30D"}</button>
                         ))}
                       </span>
                     </span>
@@ -1174,7 +1191,7 @@ export default function ProjectDetailPage() {
                 <button className="btn btn-quiet" onClick={freezeSpecial} disabled={!isAdmin || spBusy || !spReport || !!spFrozenMeta} title={isAdmin ? "Freeze this window as a permanent edition" : "Editor access required"}>FREEZE AS EDITION</button>
               </div>
               <div className="muted" style={{ fontSize: 10, marginBottom: 10 }}>
-                times are in your local timezone &middot; engagement shown is what was GAINED inside the window (sighting-to-sighting) &middot; movement before a post&apos;s first scan is attributed to that first scan
+                times are ST. LUCIA local (UTC-4) &middot; engagement shown is what was GAINED inside the window (sighting-to-sighting) &middot; movement before a post&apos;s first scan is attributed to that first scan
               </div>
               {spReport && (() => {
                 const t = spReport.totals || {};
