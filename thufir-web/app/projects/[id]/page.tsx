@@ -225,6 +225,13 @@ export default function ProjectDetailPage() {
   const [catEdit, setCatEdit] = useState(false);
   const [edition, setEdition] = useState<any>(null);   // {label, start, end, topics}
   const [editionLoading, setEditionLoading] = useState(false);
+  const [spFrom, setSpFrom] = useState("");
+  const [spTo, setSpTo] = useState("");
+  const [spLabel, setSpLabel] = useState("");
+  const [spBusy, setSpBusy] = useState(false);
+  const [spReport, setSpReport] = useState<any>(null);      // live preview OR frozen report
+  const [spFrozenMeta, setSpFrozenMeta] = useState<any>(null); // set when viewing a saved one
+  const [spList, setSpList] = useState<any[]>([]);
   // Background refreshes (loadMeta) must respect what the analyst selected.
   // Hard-coding window=month here once made the map silently swap month data
   // under a DAY chip — the UI claimed "today" while showing three-week-old
@@ -381,6 +388,49 @@ export default function ProjectDetailPage() {
       setEdition(v);
     } catch (e: any) { setError(e.message || "Couldn't load the edition."); }
     finally { setEditionLoading(false); }
+  }
+
+  async function loadSpecials() {
+    if (!idValid) return;
+    try {
+      const v = await call(`/projects/${id}/editions`, "GET");
+      setSpList(v.editions || []);
+    } catch { /* shelf is optional */ }
+  }
+
+  async function extractSpecial() {
+    if (!spFrom || !spTo) { setError("Pick both start and end."); return; }
+    setSpBusy(true); setError(null); setSpFrozenMeta(null);
+    try {
+      const qs = `start=${encodeURIComponent(new Date(spFrom).toISOString())}&end=${encodeURIComponent(new Date(spTo).toISOString())}`;
+      const v = await call(`/projects/${id}/editions/extract?${qs}`, "GET");
+      setSpReport(v);
+    } catch (e: any) { setError(e.message || "Extraction failed."); }
+    finally { setSpBusy(false); }
+  }
+
+  async function freezeSpecial() {
+    if (!spFrom || !spTo) return;
+    setSpBusy(true); setError(null);
+    try {
+      const v = await call(`/projects/${id}/editions`, "POST", {
+        start: new Date(spFrom).toISOString(), end: new Date(spTo).toISOString(),
+        label: spLabel,
+      });
+      setMsg(`Edition FROZEN: ${v.label}`);
+      await loadSpecials();
+    } catch (e: any) { setError(e.message || "Freeze failed."); }
+    finally { setSpBusy(false); }
+  }
+
+  async function openSaved(eid: string) {
+    setSpBusy(true); setError(null);
+    try {
+      const v = await call(`/projects/${id}/editions/${eid}`, "GET");
+      setSpReport(v.report);
+      setSpFrozenMeta({ label: v.label, created_by: v.created_by, created_at: v.created_at });
+    } catch (e: any) { setError(e.message || "Couldn't open the edition."); }
+    finally { setSpBusy(false); }
   }
 
   async function saveKinds() {
@@ -556,7 +606,7 @@ export default function ProjectDetailPage() {
               <div className="seg">
                 <button data-on={view === "dash"} onClick={() => setView("dash")}>DASHBOARD</button>
                 <button data-on={view === "duel"} onClick={() => setView("duel")}>HEAD-TO-HEAD</button>
-                <button data-on={view === "edition"} onClick={() => { setView("edition"); loadEdition(); }}>EDITION</button>
+                <button data-on={view === "edition"} onClick={() => { setView("edition"); loadEdition(); loadSpecials(); }}>EDITION</button>
               </div>
               <span style={{ width: 14 }} />
               <div className="seg" title="Configuration and maintenance — the technical door">
@@ -1103,6 +1153,87 @@ export default function ProjectDetailPage() {
                 })()}
               </div>
             </div>
+        )}
+        {view === "edition" && (
+          <div className="panel" style={{ marginTop: 14 }}>
+            <div className="panel-head">
+              <span className="panel-title">SPECIAL EDITIONS</span>
+              <span className="muted" style={{ fontSize: 11 }}>
+                any window, measured between scans &mdash; frozen editions never change
+              </span>
+            </div>
+            <div className="panel-body" style={{ padding: 10 }}>
+              <div className="row" style={{ gap: 10, flexWrap: "wrap", alignItems: "flex-end", marginBottom: 10 }}>
+                <label className="muted" style={{ fontSize: 11 }}>FROM<br />
+                  <input type="datetime-local" value={spFrom} onChange={(e) => setSpFrom(e.target.value)} disabled={!isAdmin} title={isAdmin ? "" : "Editor access required"} /></label>
+                <label className="muted" style={{ fontSize: 11 }}>TO<br />
+                  <input type="datetime-local" value={spTo} onChange={(e) => setSpTo(e.target.value)} disabled={!isAdmin} title={isAdmin ? "" : "Editor access required"} /></label>
+                <label className="muted" style={{ fontSize: 11 }}>LABEL (optional)<br />
+                  <input type="text" placeholder="e.g. Micoud shooting, first 8 hours" value={spLabel} onChange={(e) => setSpLabel(e.target.value)} style={{ width: 260 }} disabled={!isAdmin} /></label>
+                <button className="btn" onClick={extractSpecial} disabled={!isAdmin || spBusy} title={isAdmin ? "Compute this window now (not saved)" : "Editor access required"}>{spBusy ? "WORKING…" : "EXTRACT"}</button>
+                <button className="btn btn-quiet" onClick={freezeSpecial} disabled={!isAdmin || spBusy || !spReport || !!spFrozenMeta} title={isAdmin ? "Freeze this window as a permanent edition" : "Editor access required"}>FREEZE AS EDITION</button>
+              </div>
+              <div className="muted" style={{ fontSize: 10, marginBottom: 10 }}>
+                times are in your local timezone &middot; engagement shown is what was GAINED inside the window (sighting-to-sighting) &middot; movement before a post&apos;s first scan is attributed to that first scan
+              </div>
+              {spReport && (() => {
+                const t = spReport.totals || {};
+                const num = { fontSize: 22, fontWeight: 700, fontFamily: "var(--font-mono)", color: "#E4E7EB", lineHeight: 1.1 } as any;
+                const cap = { fontSize: 10, letterSpacing: "0.12em", color: "#8B949E", marginTop: 2 } as any;
+                return (
+                  <div style={{ borderTop: "1px solid #2A2D35", paddingTop: 10 }}>
+                    <div className="row" style={{ justifyContent: "space-between", flexWrap: "wrap", marginBottom: 6 }}>
+                      <span style={{ fontWeight: 600, color: "#E4E7EB", fontSize: 13 }}>{spFrozenMeta?.label || spReport.label}</span>
+                      {spFrozenMeta
+                        ? <span style={{ fontSize: 10, color: "#C2A34F", letterSpacing: "0.1em" }}>FROZEN &middot; saved {new Date(spFrozenMeta.created_at).toLocaleString()} by {spFrozenMeta.created_by}</span>
+                        : <span className="muted" style={{ fontSize: 10 }}>live preview &mdash; not saved</span>}
+                    </div>
+                    <div className="row" style={{ gap: 24, flexWrap: "wrap", marginBottom: 12 }}>
+                      <div><div style={num}>{t.posts_new ?? 0}</div><div style={cap}>NEW POSTS</div></div>
+                      <div><div style={num}>{t.posts_active ?? 0}</div><div style={cap}>POSTS MOVING</div></div>
+                      <div><div style={num}>{(t.eng_delta ?? 0).toLocaleString()}</div><div style={cap}>ENGAGEMENT GAINED</div></div>
+                      <div><div style={num}>{t.stories ?? 0}</div><div style={cap}>STORIES</div></div>
+                      <div><div style={num}>{t.pages_entering ?? 0}</div><div style={cap}>PAGES ENTERING</div></div>
+                    </div>
+                    {(spReport.stories || []).slice(0, 12).map((st: any) => (
+                      <div key={st.cluster_id || st.name} style={{ borderTop: "1px solid #22252C", padding: "8px 2px" }}>
+                        <div className="row" style={{ justifyContent: "space-between", flexWrap: "wrap" }}>
+                          <span style={{ fontSize: 13, color: "#E4E7EB", fontWeight: 600 }}>
+                            <span style={{ display: "inline-block", width: 8, height: 8, borderRadius: 4, marginRight: 7,
+                              background: st.mood === "positive" ? "#4C9A6E" : st.mood === "negative" ? "#B0524D" : "#5B616E" }} />
+                            {st.name}
+                          </span>
+                          <span style={{ fontFamily: "var(--font-mono)", fontSize: 12, color: "#C2A34F" }}>+{(st.eng_delta ?? 0).toLocaleString()}</span>
+                        </div>
+                        <div className="muted" style={{ fontSize: 11, marginTop: 3 }}>
+                          {st.posts_new} new post{st.posts_new === 1 ? "" : "s"}
+                          {st.new_carriers?.length ? <> &middot; entering: {st.new_carriers.join(", ")}</> : null}
+                        </div>
+                        {(st.top_posts || []).slice(0, 2).map((tp: any, i: number) => (
+                          <div key={i} className="muted" style={{ fontSize: 11, marginTop: 2, paddingLeft: 15 }}>
+                            &ldquo;{tp.head}&rdquo; &mdash; {tp.page} (+{tp.eng_delta})
+                          </div>
+                        ))}
+                      </div>
+                    ))}
+                  </div>
+                );
+              })()}
+              <div style={{ borderTop: "1px solid #2A2D35", marginTop: 12, paddingTop: 8 }}>
+                <div className="muted" style={{ fontSize: 10, letterSpacing: "0.12em", marginBottom: 6 }}>SAVED EDITIONS</div>
+                {spList.length === 0 && <div className="muted" style={{ fontSize: 11 }}>None yet &mdash; the first frozen edition will appear here.</div>}
+                {spList.map((ed: any) => (
+                  <div key={ed.id} className="row" style={{ justifyContent: "space-between", padding: "4px 2px", cursor: "pointer" }}
+                       onClick={() => openSaved(ed.id)} title="Open this frozen edition">
+                    <span style={{ fontSize: 12, color: "#B8BEC7" }}>{ed.label}</span>
+                    <span className="muted" style={{ fontSize: 10, fontFamily: "var(--font-mono)" }}>
+                      +{(ed.totals?.eng_delta ?? 0).toLocaleString()} &middot; {new Date(ed.created_at).toLocaleDateString()}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
         )}
         {view === "setup" && (
           <div className="ops-stack" style={{ flexDirection: "column", gap: 14 }}>
