@@ -577,6 +577,7 @@ export default function ProjectDetailPage() {
     return d.toLocaleString("en-GB", { ...opts, timeZone: "UTC" });
   };
   const mkIso = (local: string) => `${local}:00${mkOffStr}`;   // picker value IS market time
+  const mNowLocal = () => new Date(Date.now() + mkOff * 3600e3).toISOString().slice(0, 16);
   const anchorChip = ana?.anchor_day ? mfmt(`${ana.anchor_day}T12:00:00Z`, { day: "2-digit", month: "short" }).toUpperCase() : "LATEST DAY";
   const topPostsWindowed = (() => {
     const posts = ((ana?.top_posts || []) as any[]).filter((p) => !p.dateless);
@@ -1089,7 +1090,7 @@ export default function ProjectDetailPage() {
           <div className="panel-body">
             <div className="muted" style={{ fontSize: 11, fontFamily: "var(--font-mono)", marginBottom: 10 }}>
               {stitchBusy ? "Stitch pass running — decisions land in the ops feed below."
-                : narratives.length ? `${narratives.length} durable narratives · PENETRATION = share of engagement that landed OUTSIDE the bloc the story started in`
+                : narratives.length ? `${narratives.length} durable narratives \u00b7 data through ${String((narratives.map((n: any) => n.last_seen || "").sort().slice(-1)[0] || "")).slice(0, 10)} \u00b7 PENETRATION = how far a story traveled outside its origin bloc \u2014 measures spread, not good or bad`
                 : "No narratives yet — run DRY RUN, read the decisions in the ops feed, then COMMIT."}
             </div>
             {narratives.length > 0 && (
@@ -1100,7 +1101,11 @@ export default function ProjectDetailPage() {
                   const origin = [...days].reverse().find((d: any) => d.origin_faction)?.origin_faction || null;
                   const pen = n.penetration;
                   const pct = pen === null || pen === undefined ? null : Math.round(pen * 100);
-                  const hue = pct === null ? "var(--muted)" : pct >= 50 ? "var(--danger)" : pct >= 20 ? "var(--amber)" : "#427A5B";
+                  // ONE PALETTE, ONE MEANING: red/green belong to sentiment.
+                  // Penetration is neutral REACH - blue intensity carries the
+                  // magnitude, the word carries the judgment.
+                  const hue = pct === null ? "var(--muted)" : pct >= 50 ? "#5B9BE6" : pct >= 20 ? "#3E6DAE" : "#2E4A73";
+                  const penTag = pct === null ? "\u2014" : pct >= 50 ? "ESCAPED" : pct >= 20 ? "CROSSING" : "CONTAINED";
                   return (
                     <div key={n.narrative_id} style={{ padding: "8px 0", borderBottom: "1px solid var(--rowline)" }}>
                       <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
@@ -1109,6 +1114,7 @@ export default function ProjectDetailPage() {
                           {n.posts}p · {pages}pg · {(n.engagement || 0).toLocaleString()} eng · {n.days}d
                         </span>
                         {origin && <span className="chip" style={{ fontSize: 9 }}>{origin}</span>}
+                        <span style={{ ...MONO, fontSize: 9, color: hue, letterSpacing: 1 }}>{penTag}</span>
                         <span style={{ ...MONO, fontSize: 11, color: hue, width: 44, textAlign: "right" }}>
                           {pct === null ? "—" : `${pct}%`}
                         </span>
@@ -1185,6 +1191,8 @@ export default function ProjectDetailPage() {
                   <input type="datetime-local" value={spFrom} onChange={(e) => setSpFrom(e.target.value)} disabled={!isAdmin} title={isAdmin ? "" : "Editor access required"} /></label>
                 <label className="muted" style={{ fontSize: 11 }}>TO<br />
                   <input type="datetime-local" value={spTo} onChange={(e) => setSpTo(e.target.value)} disabled={!isAdmin} title={isAdmin ? "" : "Editor access required"} /></label>
+                <button className="btn btn-quiet" style={{ fontSize: 10 }} disabled={!isAdmin} onClick={() => setSpTo(mNowLocal())} title="Set TO to the market's current time">NOW</button>
+                <span className="muted" style={{ fontSize: 10, alignSelf: "center", fontFamily: "var(--font-mono)" }}>market clock: {mNowLocal().replace("T", " ")} {ana?.market_tz || "UTC-4"}</span>
                 <label className="muted" style={{ fontSize: 11 }}>LABEL (optional)<br />
                   <input type="text" placeholder="e.g. Micoud shooting, first 8 hours" value={spLabel} onChange={(e) => setSpLabel(e.target.value)} style={{ width: 260 }} disabled={!isAdmin} /></label>
                 <button className="btn" onClick={extractSpecial} disabled={!isAdmin || spBusy} title={isAdmin ? "Compute this window now (not saved)" : "Editor access required"}>{spBusy ? "WORKING…" : "EXTRACT"}</button>
