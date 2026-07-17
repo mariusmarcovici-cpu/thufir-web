@@ -1237,6 +1237,7 @@ export default function ProjectDetailPage() {
                         {(st.top_posts || []).slice(0, 2).map((tp: any, i: number) => (
                           <div key={i} className="muted" style={{ fontSize: 11, marginTop: 2, paddingLeft: 15 }}>
                             &ldquo;{tp.head}&rdquo; &mdash; {tp.page} (+{tp.eng_delta})
+                            {tp.url && <>{" "}<a href={tp.url} target="_blank" rel="noreferrer" style={{ color: "#C2A34F", textDecoration: "none" }}>open&nbsp;&#8599;</a></>}
                           </div>
                         ))}
                       </div>
