@@ -1196,12 +1196,45 @@ export default function ProjectDetailPage() {
                 <label className="muted" style={{ fontSize: 11 }}>LABEL (optional)<br />
                   <input type="text" placeholder="e.g. Micoud shooting, first 8 hours" value={spLabel} onChange={(e) => setSpLabel(e.target.value)} style={{ width: 260 }} disabled={!isAdmin} /></label>
                 <button className="btn" onClick={extractSpecial} disabled={!isAdmin || spBusy} title={isAdmin ? "Compute this window now (not saved)" : "Editor access required"}>{spBusy ? "WORKING…" : "EXTRACT"}</button>
+                <button className="btn btn-quiet no-print" onClick={() => window.print()} disabled={!spReport} title="Print / save as PDF — document-grade export of the report below">EXPORT PDF</button>
                 <button className="btn btn-quiet" onClick={freezeSpecial} disabled={!isAdmin || spBusy || !spReport || !!spFrozenMeta} title={isAdmin ? "Freeze this window as a permanent edition" : "Editor access required"}>FREEZE AS EDITION</button>
               </div>
               <div className="muted" style={{ fontSize: 10, marginBottom: 10 }}>
                 times are ST. LUCIA local (UTC-4) &middot; engagement shown is what was GAINED inside the window (sighting-to-sighting) &middot; movement before a post&apos;s first scan is attributed to that first scan
               </div>
-              {spReport && (() => {
+
+      <style>{`
+        .print-only { display: none; }
+        @media print {
+          body { background: #fff !important; }
+          body * { visibility: hidden; }
+          .edition-print-root, .edition-print-root * { visibility: visible; }
+          .edition-print-root { position: absolute; left: 0; top: 0; width: 100%;
+            background: #fff !important; color: #111 !important; padding: 8mm; }
+          .edition-print-root * { background: transparent !important; color: #111 !important;
+            border-color: #999 !important; text-shadow: none !important; }
+          .edition-print-root a { color: #7A5F1E !important; text-decoration: none; }
+          .edition-print-root .no-print, .edition-print-root button { display: none !important; }
+          .print-only { display: block !important; color: #111 !important; }
+          .print-head { border-bottom: 2px solid #7A5F1E !important; padding-bottom: 8px; margin-bottom: 14px; }
+          .print-head div:first-child, .print-methodology div:first-child { color: #7A5F1E !important; }
+          .print-methodology { page-break-before: always; border-top: 1px solid #999; padding-top: 10px;
+            font-size: 11px; line-height: 1.6; }
+          .print-methodology p { margin: 0 0 8px 0; }
+          .edition-story { page-break-inside: avoid; }
+        }
+      `}</style>
+              {spReport && <div className="edition-print-root">{/* print furniture renders only on paper */}
+              <div className="print-only print-head">
+                <div style={{ letterSpacing: "0.28em", fontSize: 11 }}>THUFIR</div>
+                <div style={{ fontSize: 16, fontWeight: 700, marginTop: 4 }}>{spFrozenMeta?.label || spReport?.label}</div>
+                <div style={{ fontSize: 10, marginTop: 3 }}>
+                  {spFrozenMeta
+                    ? `FROZEN EDITION — saved ${new Date(spFrozenMeta.created_at).toLocaleString()} · this document never changes`
+                    : "LIVE PREVIEW — not frozen; numbers may still move"}
+                </div>
+              </div>
+              {(() => {
                 const t = spReport.totals || {};
                 const num = { fontSize: 22, fontWeight: 700, fontFamily: "var(--font-mono)", color: "#E4E7EB", lineHeight: 1.1 } as any;
                 const cap = { fontSize: 10, letterSpacing: "0.12em", color: "#8B949E", marginTop: 2 } as any;
@@ -1221,7 +1254,7 @@ export default function ProjectDetailPage() {
                       <div><div style={num}>{t.pages_entering ?? 0}</div><div style={cap}>PAGES ENTERING</div></div>
                     </div>
                     {(spReport.stories || []).slice(0, 12).map((st: any) => (
-                      <div key={st.cluster_id || st.name} style={{ borderTop: "1px solid #22252C", padding: "8px 2px" }}>
+                      <div key={st.cluster_id || st.name} className="edition-story" style={{ borderTop: "1px solid #22252C", padding: "8px 2px" }}>
                         <div className="row" style={{ justifyContent: "space-between", flexWrap: "wrap" }}>
                           <span style={{ fontSize: 13, color: "#E4E7EB", fontWeight: 600 }}>
                             <span style={{ display: "inline-block", width: 8, height: 8, borderRadius: 4, marginRight: 7,
@@ -1245,13 +1278,22 @@ export default function ProjectDetailPage() {
                   </div>
                 );
               })()}
+              <div className="print-only print-methodology">
+                <div style={{ letterSpacing: "0.22em", fontSize: 11, marginBottom: 8 }}>HOW TO READ THIS EDITION</div>
+                <p><b>The window.</b> Every number measures what happened between the FROM and TO moments shown at the top, in Saint Lucia local time (UTC-4). Engagement shown is what was GAINED inside the window, measured sighting-to-sighting between scans; movement before a post&apos;s first scan is attributed to that first scan.</p>
+                <p><b>New posts vs. posts moving.</b> &ldquo;New&rdquo; = first seen inside the window. &ldquo;Moving&rdquo; = any post whose engagement changed inside it, whenever it was published.</p>
+                <p><b>Frozen means frozen.</b> A frozen edition is computed once and stored forever &mdash; reopening or reprinting it will always show these exact numbers. A live preview is not frozen and may differ tomorrow.</p>
+                <p><b>What is not claimed.</b> Numbers reflect public Facebook activity of the monitored source list only &mdash; not all of Saint Lucia, not private groups, not reach or impressions. Anything the data did not contain appears as &ldquo;&mdash;&rdquo;, never as a guess.</p>
+                <div style={{ marginTop: 14, fontSize: 9, letterSpacing: "0.1em" }}>THUFIR · FROZEN EDITIONS NEVER CHANGE · GENERATED FROM COLLECTED PUBLIC DATA</div>
+              </div>
+              </div>}
               <div style={{ borderTop: "1px solid #2A2D35", marginTop: 12, paddingTop: 8 }}>
                 <div className="muted" style={{ fontSize: 10, letterSpacing: "0.12em", marginBottom: 6 }}>SAVED EDITIONS</div>
                 {spList.length === 0 && <div className="muted" style={{ fontSize: 11 }}>None yet &mdash; the first frozen edition will appear here.</div>}
                 {spList.map((ed: any) => (
                   <div key={ed.id} className="row" style={{ justifyContent: "space-between", padding: "4px 2px", cursor: "pointer" }}
                        onClick={() => openSaved(ed.id)} title="Open this frozen edition">
-                    <span style={{ fontSize: 12, color: "#B8BEC7" }}>{ed.label}</span>
+                    <span style={{ fontSize: 12, color: "#B8BEC7" }}>{ed.label}{String(ed.label || "").startsWith("daily —") && <span style={{ fontSize: 9, color: "#3E6DAE", border: "1px solid #2A3A52", borderRadius: 3, padding: "1px 5px", marginLeft: 7, letterSpacing: "0.1em" }}>DAILY</span>}</span>
                     <span className="muted" style={{ fontSize: 10, fontFamily: "var(--font-mono)" }}>
                       +{(ed.totals?.eng_delta ?? 0).toLocaleString()} &middot; {new Date(ed.created_at).toLocaleDateString()}
                     </span>
