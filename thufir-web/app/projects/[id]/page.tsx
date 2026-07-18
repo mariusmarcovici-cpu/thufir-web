@@ -229,7 +229,8 @@ export default function ProjectDetailPage() {
   const [spTo, setSpTo] = useState("");
   const [spLabel, setSpLabel] = useState("");
   const [spBusy, setSpBusy] = useState(false);
-  const [spReport, setSpReport] = useState<any>(null);      // live preview OR frozen report
+  const [spReport, setSpReport] = useState<any>(null);
+  const [manualOpen, setManualOpen] = useState(false);      // live preview OR frozen report
   const [spFrozenMeta, setSpFrozenMeta] = useState<any>(null); // set when viewing a saved one
   const [spList, setSpList] = useState<any[]>([]);
   // Background refreshes (loadMeta) must respect what the analyst selected.
@@ -1597,6 +1598,25 @@ export default function ProjectDetailPage() {
             </div>
           </div>
         )}
+
+        {/* ============ MANUAL — the platform explains itself ============ */}
+        <div className="panel no-print" style={{ marginTop: 14 }}>
+          <div className="row" style={{ justifyContent: "space-between", cursor: "pointer" }} onClick={() => setManualOpen(v => !v)}>
+            <span className="panel-title">? &nbsp;MANUAL &mdash; HOW TO READ THUFIR</span>
+            <span className="muted" style={{ fontSize: 11 }}>{manualOpen ? "collapse" : "expand"}</span>
+          </div>
+          {manualOpen && (
+            <div style={{ fontSize: 12.5, lineHeight: 1.65, color: "#B8BEC7", marginTop: 10, maxWidth: 860 }}>
+              <p><b style={{ color: "#E4E7EB" }}>What Thufir watches.</b> A human-curated roster of public Facebook pages, groups and sites relevant to Saint Lucia. It reads only public posts. It does not see private groups, messages, reach or ad spend &mdash; and it never pretends to.</p>
+              <p><b style={{ color: "#E4E7EB" }}>The clock.</b> Everything runs on Saint Lucia local time (UTC-4). The editorial day starts at 08:00 &mdash; a &ldquo;day&rdquo; on any panel means 8&nbsp;AM to 8&nbsp;AM, the way a morning paper counts a day. The automatic cycle collects, clusters, names and files each morning at 08:00.</p>
+              <p><b style={{ color: "#E4E7EB" }}>Leaderboard.</b> Pages ranked by engagement (reactions + comments + shares) gained on the day shown in the date chip &mdash; always the latest fully collected editorial day. &ldquo;% of top 10&rdquo; is that page&apos;s share of the ten listed pages&apos; combined engagement &mdash; a share of the visible race, not of the whole island.</p>
+              <p><b style={{ color: "#E4E7EB" }}>Topic map.</b> Posts about the same event are clustered into stories and named automatically. Bubble size follows engagement in the selected window (24H / 7D / 30D). The mood dot is the story&apos;s overall tone: green positive, red negative, grey neutral. A story briefly labelled &ldquo;(new story - unnamed)&rdquo; is minutes old &mdash; the next cycle names it.</p>
+              <p><b style={{ color: "#E4E7EB" }}>Narratives &amp; penetration.</b> A narrative is a storyline that persists across days. Its <i>origin faction</i> is the camp whose pages carried it first. <b>Penetration</b> is the share of the narrative&apos;s engagement happening <i>outside</i> that origin camp &mdash; counting only pages whose faction a human has assigned. Below 20% it is <b>CONTAINED</b> (circulating at home), 20&ndash;49% <b>CROSSING</b> (leaking into other camps), 50%+ <b>ESCAPED</b> (living beyond its origin). It measures <i>spread, not good or bad</i> &mdash; a congratulation and an attack can both escape. Factions are assigned by humans in SETUP and never guessed by the machine; where they are unset, penetration shows &ldquo;&mdash;&rdquo; instead of a guess.</p>
+              <p><b style={{ color: "#E4E7EB" }}>Editions.</b> An edition measures a time window: engagement shown is what was <i>gained inside the window</i>, sighting-to-sighting between scans (movement before a post&apos;s first scan is attributed to that scan). <b>FREEZE</b> computes once and stores forever &mdash; a frozen edition never changes, which is what makes it evidence. The scheduler files a <b>DAILY</b> edition automatically each morning; <b>EXPORT PDF</b> turns any frozen edition into a fixed, dated document with this methodology attached.</p>
+              <p><b style={{ color: "#E4E7EB" }}>The house conventions.</b> Anything the data did not contain appears as &ldquo;&mdash;&rdquo; &mdash; never as zero, never as a guess. Posts without a readable date count in totals but are excluded from time-axes, and every report says how many. Numbers reflect the moment of scraping; public engagement keeps moving afterwards.</p>
+            </div>
+          )}
+        </div>
       </div>
     </>
   );
