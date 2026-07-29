@@ -59,12 +59,22 @@ function packBubbles(items: { r: number }[], W: number, H: number) {
 
 function WordBubbles({ topics, onPick }: { topics: any[]; onPick?: (id: string) => void }) {
   const W = 1280, H = 400;
-  const items = topics.slice(0, 24).map((t: any) => ({
-    id: t.topic_cluster_id,
-    word: String(t.label || "").split(/[\/·]| - /)[0].trim().split(" ").slice(0, 4).join(" ") || "topic",
-    full: t.label, n: t.posts || 0, eng: t.engagement || 0,
-    mood: t.mood || "neutral", category: t.category,
-  }));
+  const [hov, setHov] = useState<{ i: number; x: number; y: number } | null>(null);
+  const items = topics.slice(0, 24).map((t: any) => {
+    const raw = String(t.label || "").trim();
+    const termish = raw.includes(" / ");
+    // NEVER amputate: a proper name renders whole (budget-wrapped below);
+    // an unnamed term label shows a TERM PAIR ("carnival · parade"), not one word.
+    const display = termish
+      ? raw.split(" / ").slice(0, 2).map((s) => s.trim()).filter(Boolean).join(" · ")
+      : raw;
+    return {
+      id: t.topic_cluster_id, display: display || "topic", full: raw, termish,
+      n: t.posts || 0, pages: t.pages_talking || 0, eng: t.engagement || 0,
+      mood: t.mood || "neutral", category: t.category, terms: t.top_terms,
+      snippet: t.snippet, delta: t.velocity_delta_pct,
+    };
+  });
   const maxE = Math.max(1, ...items.map((i) => i.eng));
   let sized = items.map((i) => ({ ...i, r: 22 + 46 * Math.sqrt(i.eng / maxE) }))
     .sort((a, b) => b.r - a.r);
@@ -73,39 +83,76 @@ function WordBubbles({ topics, onPick }: { topics: any[]; onPick?: (id: string) 
     sized = sized.map((b) => ({ ...b, r: Math.max(16, b.r * shrink) }));
     pos = packBubbles(sized, W, H);
   }
+  const hb = hov ? sized[hov.i] : null;
   return (
-    <svg viewBox={`0 0 ${W} ${H}`} style={{ width: "100%", height: "auto", maxHeight: "55vh", display: "block", margin: "0 auto" }}>
-      {sized.map((b, i) => pos[i].r > 0 && (
-        <g key={i} onClick={() => b.id && onPick?.(b.id)} style={{ cursor: onPick ? "pointer" : "default" }}>
-          <title>{b.full} — {b.n} posts · {b.eng.toLocaleString()} engagement · {b.mood}</title>
-          <circle cx={pos[i].x} cy={pos[i].y} r={b.r} fill={BUBBLE_FILL[b.mood] || BUBBLE_FILL.neutral} stroke={BUBBLE_STROKE[b.mood] || BUBBLE_STROKE.neutral} strokeWidth={1.5} />
-          {(() => {
-            const fs = Math.max(9, b.r / 3.6);
-            const budget = Math.max(6, Math.floor((b.r * 1.7) / (fs * 0.6)));
-            const words = b.word.split(" ");
-            let l1 = "", k = 0;
-            while (k < words.length && (l1 + " " + words[k]).trim().length <= budget) { l1 = (l1 + " " + words[k]).trim(); k++; }
-            if (!l1) { l1 = words[0].slice(0, Math.max(4, budget - 1)) + "…"; k = 1; }
-            let l2 = words.slice(k).join(" ");
-            if (l2.length > budget) l2 = l2.slice(0, budget - 1) + "…";
-            const two = !!l2;
-            return (
-              <>
-                <text x={pos[i].x} y={pos[i].y - (two ? fs * 0.55 : 3)} textAnchor="middle"
-                  style={{ fontSize: fs, fontWeight: 600, fill: BUBBLE_TEXT[b.mood] || "#B8BEC7" }}>
-                  {l1}
-                  {two && <tspan x={pos[i].x} dy={fs * 1.12}>{l2}</tspan>}
-                </text>
-                <text x={pos[i].x} y={pos[i].y + (two ? fs * 2.05 : Math.max(10, b.r / 3))} textAnchor="middle"
-                  style={{ fontSize: Math.max(8, b.r / 4), fill: "#8B949E", fontFamily: "var(--font-mono)" }}>
-                  {b.n}
-                </text>
-              </>
-            );
-          })()}
-        </g>
-      ))}
-    </svg>
+    <div style={{ position: "relative" }}>
+      <svg viewBox={`0 0 ${W} ${H}`} style={{ width: "100%", height: "auto", maxHeight: "55vh", display: "block", margin: "0 auto" }}
+        onMouseLeave={() => setHov(null)}>
+        {sized.map((b, i) => pos[i].r > 0 && (
+          <g key={i} onClick={() => b.id && onPick?.(b.id)} style={{ cursor: onPick ? "pointer" : "default" }}
+            onMouseEnter={(e) => setHov({ i, x: e.nativeEvent.offsetX, y: e.nativeEvent.offsetY })}
+            onMouseMove={(e) => setHov({ i, x: e.nativeEvent.offsetX, y: e.nativeEvent.offsetY })}>
+            <circle cx={pos[i].x} cy={pos[i].y} r={b.r} fill={BUBBLE_FILL[b.mood] || BUBBLE_FILL.neutral} stroke={BUBBLE_STROKE[b.mood] || BUBBLE_STROKE.neutral} strokeWidth={1.5} />
+            {(() => {
+              // radius ladder: tiny circles are physics, not typography —
+              // one token + count; everything bigger gets two budget-wide lines.
+              const fs = Math.max(9, b.r / 3.6);
+              const budget = Math.max(6, Math.floor((b.r * 1.7) / (fs * 0.6)));
+              const words = b.display.split(" ");
+              let l1 = "", k = 0, l2 = "";
+              if (b.r < 26) {
+                l1 = words[0].length > budget ? words[0].slice(0, Math.max(4, budget - 1)) + "…" : words[0];
+              } else {
+                while (k < words.length && (l1 + " " + words[k]).trim().length <= budget) { l1 = (l1 + " " + words[k]).trim(); k++; }
+                if (!l1) { l1 = words[0].slice(0, Math.max(4, budget - 1)) + "…"; k = 1; }
+                l2 = words.slice(k).join(" ");
+                if (l2.length > budget) l2 = l2.slice(0, budget - 1) + "…";
+              }
+              const two = !!l2;
+              return (
+                <>
+                  <text x={pos[i].x} y={pos[i].y - (two ? fs * 0.55 : 3)} textAnchor="middle"
+                    style={{ fontSize: fs, fontWeight: 600, fill: BUBBLE_TEXT[b.mood] || "#B8BEC7" }}>
+                    {l1}
+                    {two && <tspan x={pos[i].x} dy={fs * 1.12}>{l2}</tspan>}
+                  </text>
+                  <text x={pos[i].x} y={pos[i].y + (two ? fs * 2.05 : Math.max(10, b.r / 3))} textAnchor="middle"
+                    style={{ fontSize: Math.max(8, b.r / 4), fill: "#8B949E", fontFamily: "var(--font-mono)" }}>
+                    {b.n}
+                  </text>
+                </>
+              );
+            })()}
+          </g>
+        ))}
+      </svg>
+      {hb && hov && (
+        <div style={{
+          position: "absolute", left: Math.min(hov.x + 14, 980), top: Math.min(hov.y + 14, 300),
+          maxWidth: 300, background: "var(--void)", border: "1px solid var(--carbon)",
+          padding: "10px 12px", pointerEvents: "none", zIndex: 30, boxShadow: "0 6px 18px rgba(0,0,0,.45)",
+        }}>
+          <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 5, lineHeight: 1.3 }}>
+            {hb.termish ? `${hb.full.split(" / ").join(" · ")}` : hb.full}
+            {hb.termish && <span style={{ fontSize: 10, color: "var(--muted)", fontWeight: 400 }}> (terms — story not yet named)</span>}
+          </div>
+          <div style={{ fontSize: 11, fontFamily: "var(--font-mono)", color: "var(--amber)", marginBottom: 4 }}>
+            {hb.n} posts · {hb.pages || "—"} pages · {hb.eng.toLocaleString()} eng
+            {hb.delta != null && <span style={{ color: "var(--muted)" }}> · {hb.delta > 0 ? "+" : ""}{hb.delta}% vs prior</span>}
+          </div>
+          {(hb.category || hb.mood) && (
+            <div style={{ fontSize: 10, letterSpacing: 0.5, color: "var(--muted)", marginBottom: hb.snippet ? 5 : 0, textTransform: "uppercase" }}>
+              {[hb.category, hb.mood].filter(Boolean).join(" · ")}
+            </div>
+          )}
+          {hb.snippet && (
+            <div style={{ fontSize: 11, color: "var(--muted)", fontStyle: "italic", lineHeight: 1.35 }}>
+              “{hb.snippet}”
+            </div>
+          )}
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -614,7 +661,7 @@ export default function ProjectDetailPage() {
               {(project.project.languages || []).map((l: string) => <span key={l} className="chip">{l.toUpperCase()}</span>)}
               {pulseVal && (
                 <span className="chip" style={{ display: "inline-flex", alignItems: "center", gap: 6, background: "var(--console)" }}>
-                  <span style={{ fontSize: 9, letterSpacing: 1 }}>MARKET PULSE</span>
+                  <span style={{ fontSize: 9, letterSpacing: 1 }} title="Engagement in the last editorial day vs the prior-days baseline: \u22651.5\u00d7 intense \u00b7 \u22640.5\u00d7 calm \u00b7 else steady">MARKET PULSE</span>
                   <span style={{ width: 6, height: 6, background: pulseSwatch, display: "inline-block" }} />
                   <span style={{ fontSize: 11, color: "var(--text)" }}>{pulseVal}</span>
                 </span>
@@ -836,12 +883,12 @@ export default function ProjectDetailPage() {
                   <div style={{ background: "var(--console)", padding: "18px 20px" }}>
                     <div className="stat-label" style={{ marginBottom: 10 }}>Total engagement</div>
                     <div className="stat-value">{s.total_engagement.toLocaleString()}</div>
-                    <div className="stat-sub">reactions · shares · views</div>
+                    <div className="stat-sub">reactions · shares</div>
                   </div>
                   <div style={{ background: "var(--console)", padding: "18px 20px" }}>
-                    <div className="stat-label" style={{ marginBottom: 10 }}>Pages · topics</div>
-                    <div className="stat-value">{s.pages} · {s.topics}</div>
-                    <div className="stat-sub">semantic index</div>
+                    <div className="stat-label" style={{ marginBottom: 10 }}>Pages · named stories</div>
+                    <div className="stat-value">{s.pages} · {velo?.window_stats ? velo.window_stats.named : s.topics}</div>
+                    <div className="stat-sub">{velo?.window_stats ? `of ${velo.window_stats.clusters} clusters · map window` : "semantic index"}</div>
                   </div>
               </div>
 
@@ -870,7 +917,7 @@ export default function ProjectDetailPage() {
 
                 <div className="panel" style={{ flex: 45 }}>
                   <div className="panel-head"><NetworkIcon />Engagement clusters
-                    {velo?.network_integrity != null && <span className="ph-right"><span className="chip" style={{ color: "#8FBFA6" }}>NETWORK INTEGRITY {Math.round(velo.network_integrity * 100)}%</span></span>}
+                    
                   </div>
                   <div className="panel-body" style={{ padding: "6px 16px", display: "flex", flexDirection: "column", justifyContent: "space-between" }}>
                     {topClusters.map((t: any) => (
