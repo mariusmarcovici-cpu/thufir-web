@@ -628,6 +628,11 @@ export default function ProjectDetailPage() {
   const mNowLocal = () => new Date(Date.now() + mkOff * 3600e3).toISOString().slice(0, 16);
   const anchorChip = ana?.anchor_day ? mfmt(`${ana.anchor_day}T12:00:00Z`, { day: "2-digit", month: "short" }).toUpperCase() : "LATEST DAY";
   const topPostsWindowed = (() => {
+    // server-side honest windows (backend >= 0.5.21): ranked inside the REAL
+    // last 24h/7d/30d from now — a tab never shows a post older than its label.
+    const wins = (ana as any)?.top_posts_windows;
+    if (wins) return (wins[tpWin === "day" ? "day" : tpWin === "week" ? "week" : "month"] || []) as any[];
+    // fallback for an older backend: window the all-time top-10 client-side
     const posts = ((ana?.top_posts || []) as any[]).filter((p) => !p.dateless);
     const days = posts.map((p) => p.day).filter(Boolean).sort();
     if (!days.length) return posts;
@@ -963,7 +968,7 @@ export default function ProjectDetailPage() {
                           <div style={{ ...MONO, fontSize: 10, color: "var(--muted)" }}>
                             <span style={{ color: "var(--text-2)" }}>PAGE TOTAL, {lbWin === "day" ? `EDITORIAL DAY ${anchorChip}` : lbWin === "week" ? "LAST 7 EDITORIAL DAYS" : "LAST 30 EDITORIAL DAYS"}</span>
                             {" · "}{e.posts ?? 0} post{(e.posts ?? 0) === 1 ? "" : "s"}
-                            {" · "}{e.likes.toLocaleString()} reactions · {e.shares.toLocaleString()} shares · {e.views.toLocaleString()} views
+                            {" · "}{e.likes.toLocaleString()} reactions · {e.shares.toLocaleString()} shares{e.views ? ` · ${e.views.toLocaleString()} views` : ""}
                           </div>
                           {e.best_post && (
                             <div style={{ display: "flex", alignItems: "baseline", gap: 8, marginTop: 6, paddingTop: 6, borderTop: "1px dashed var(--rowline)" }}>
@@ -1107,6 +1112,11 @@ export default function ProjectDetailPage() {
                     </span>
                   </div>
                   <div className="panel-body" style={{ padding: 0 }}>
+                    {topPostsWindowed.length === 0 && (
+                      <div className="muted" style={{ padding: "14px 16px", fontSize: 12 }}>
+                        No posts in this window yet — the panel fills after the next collection run.
+                      </div>
+                    )}
                     {topPostsWindowed.slice(0, 5).map((p: any, i: number) => (
                       <div key={i} style={{ padding: "12px 16px", borderBottom: "1px solid var(--rowline)" }}>
                         <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 7 }}>
@@ -1116,7 +1126,7 @@ export default function ProjectDetailPage() {
                           <span style={{ ...MONO, fontSize: 10, marginLeft: "auto" }}><Ext href={p.url}>open post</Ext></span>
                         </div>
                         <p style={{ margin: "0 0 8px", fontSize: 12, lineHeight: 1.5, color: "#B8BEC7" }}>{p.text || <span className="muted">(no text)</span>}</p>
-                        <div style={{ ...MONO, fontSize: 10, color: "var(--muted)" }}>{p.likes.toLocaleString()} reactions · {p.shares.toLocaleString()} shares · {p.views.toLocaleString()} views · {p.engagement.toLocaleString()} total</div>
+                        <div style={{ ...MONO, fontSize: 10, color: "var(--muted)" }}>{p.likes.toLocaleString()} reactions · {p.shares.toLocaleString()} shares{p.views ? ` · ${p.views.toLocaleString()} views` : ""} · {p.engagement.toLocaleString()} engagement</div>
                       </div>
                     ))}
                   </div>
