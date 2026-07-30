@@ -860,7 +860,7 @@ export default function ProjectDetailPage() {
             <>
               {/* Category filter */}
               <div className="row" style={{ gap: 6, flexWrap: "wrap" }}>
-                {[["", "ALL"], ["media", "MEDIA"], ["group", "GROUPS"], ["politician", "POLITICIANS"], ["government", "GOVERNMENT"], ["institution", "INSTITUTIONS"]].map(([v, lbl]) => (
+                {[["", "ALL"], ["media", "MEDIA"], ["politician", "POLITICIANS"], ["government", "GOVERNMENT"], ["institution", "INSTITUTIONS"]].map(([v, lbl]) => (
                   <button key={v} className="seg-chip" data-on={cat === v}
                     style={{ fontFamily: "var(--font-mono)", fontSize: 10, letterSpacing: 1, padding: "5px 12px", cursor: "pointer", borderRadius: 0,
                       border: `1px solid ${cat === v ? "var(--amber)" : "var(--carbon)"}`,
