@@ -288,13 +288,14 @@ export default function ProjectDetailPage() {
   const catRef = useRef(cat);
   const [kindDraft, setKindDraft] = useState<Record<string, string>>({});
 
-  const analyze = useCallback(async (elena = false, category = "") => {
+  const analyze = useCallback(async (elena = false, category = "", force = false) => {
     if (!idValid) return;
     setAnalyzing(true); setError(null);
     try {
       const q = new URLSearchParams();
       if (elena) q.set("elena", "true");
       if (category) q.set("category", category);
+      if (force) q.set("force", "true");   // the button recomputes; page loads may hit the server cache
       const r = await call(`/projects/${id}/analyze${q.toString() ? "?" + q.toString() : ""}`, "POST");
       if (r.error) setError(r.error); else setAna(r);
     } catch (e: any) { setError(e.message || "Analysis failed."); }
@@ -559,12 +560,38 @@ export default function ProjectDetailPage() {
     setReproc(true); setError(null); setMsg(null);
     try {
       const r = await call(`/projects/${id}/reprocess`, "POST");
-      if (r.error) setError(`Reprocess: ${r.error}`);
-      else if (r.note) setMsg(r.note);
+      if (r.error) { setError(`Reprocess: ${r.error}`); setReproc(false); return; }
+      if (r.status === "started" || r.status === "already_running") {
+        // Detached rebuild (backend >= 0.5.23): the job runs server-side for
+        // minutes — the old code held this HTTP request open and died at
+        // Railway's ~4-min edge timeout with a fake "Failed to fetch".
+        // Now: poll the status route until it finishes, then refresh once.
+        setMsg(r.note || "Semantic rebuild running in the background — progress in the OPS FEED.");
+        const t0 = Date.now();
+        const poll = async () => {
+          if (Date.now() - t0 > 50 * 60 * 1000) { setReproc(false); setError("Rebuild still running after 50 min — check the OPS FEED."); return; }
+          try {
+            const s = await call(`/projects/${id}/reprocess/status`, "GET");
+            if (s && s.running === false) {
+              const l = s.last || {};
+              setMsg(`Semantic rebuild complete: ${l.clusters ?? "?"} topics, ${l.clusters_named ?? "?"} named.`);
+              await analyze(false, "", true);
+              await loadMeta();
+              setReproc(false);
+              return;
+            }
+          } catch { /* transient poll failure — keep polling */ }
+          setTimeout(poll, 15000);
+        };
+        setTimeout(poll, 15000);
+        return; // stay in "Rebuilding…" until the poll resolves
+      }
+      // legacy synchronous backend: full summary came back inline
+      if (r.note) setMsg(r.note);
       else setMsg(`Semantic index rebuilt: ${r.posts_reprocessed} posts → ${r.clusters} topics, ${r.clusters_named ?? 0} named (${r.embedding_provider}).`);
       await loadMeta();
-    } catch (e: any) { setError(e.message || "Reprocess failed."); }
-    finally { setReproc(false); }
+      setReproc(false);
+    } catch (e: any) { setError(e.message || "Reprocess failed."); setReproc(false); }
   }
 
   async function scout() {
@@ -682,9 +709,9 @@ export default function ProjectDetailPage() {
               <div className="seg" title="Configuration and maintenance — the technical door">
                 <button data-on={view === "setup"} onClick={() => setView("setup")}>SETUP</button>
               </div>
-              <button className="btn btn-primary" disabled={analyzing} onClick={() => analyze(false)}>{analyzing ? "ANALYSING…" : "Re-analyse"}</button>
+              <button className="btn btn-primary" disabled={analyzing} title="Recomputes dashboard stats from already-collected data. Does not re-embed or rename topics — that is Rebuild semantic index." onClick={() => analyze(false, cat, true)}>{analyzing ? "ANALYSING…" : "Refresh stats"}</button>
               {isAdmin && (<button className="btn" disabled={analyzing} onClick={() => analyze(true)}>Deep tone (Elena)</button>)}
-              {isAdmin && (<button className="btn" disabled={reproc} onClick={rebuildIndex}>{reproc ? "Rebuilding…" : "Rebuild semantic index"}</button>)}
+              {isAdmin && (<button className="btn" disabled={reproc} title="Re-embeds and NAMES topics with Gemini. Runs in the background for a few minutes — progress appears in the OPS FEED; the dashboard refreshes itself when it completes." onClick={rebuildIndex}>{reproc ? "Rebuilding…" : "Rebuild semantic index"}</button>)}
               {isOwner && (<button className="btn" onClick={() => { setTeamOpen(true); loadTeam(); }}>Team</button>)}
             </div>
           </div>
