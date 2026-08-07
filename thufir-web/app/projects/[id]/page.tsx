@@ -57,6 +57,14 @@ function packBubbles(items: { r: number }[], W: number, H: number) {
   return placed;
 }
 
+function ageLabel(day?: string): string {
+  if (!day) return "";
+  const t = new Date(day + "T12:00:00Z").getTime();
+  if (Number.isNaN(t)) return "";
+  const d = Math.max(0, Math.round((Date.now() - t) / 86400000));
+  return d === 0 ? "today" : `${d}d ago`;
+}
+
 function WordBubbles({ topics, onPick }: { topics: any[]; onPick?: (id: string) => void }) {
   const W = 1280, H = 400;
   const [hov, setHov] = useState<{ i: number; x: number; y: number } | null>(null);
@@ -1107,7 +1115,7 @@ export default function ProjectDetailPage() {
               {/* Row 4 — market talk · top posts · sources */}
               <div className="ops-stack">
                 <div className="panel" style={{ flex: 34 }}>
-                  <div className="panel-head"><VelocityIcon />What the market is talking about</div>
+                  <div className="panel-head"><VelocityIcon />What the market is talking about<span className="ph-right" style={{ fontFamily: "var(--font-mono)", fontSize: 10, color: "var(--muted)", letterSpacing: 1 }}>{topicWin === "day" ? "LAST 24H" : topicWin === "week" ? "LAST 7 DAYS" : "LAST 30 DAYS"}</span></div>
                   <div className="panel-body" style={{ padding: 0 }}>
                     {allTopics.slice(0, 12).map((t: any) => (
                       <div key={t.topic_cluster_id} onClick={() => openTopic(t.topic_cluster_id)} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, padding: "8px 16px", borderBottom: "1px solid var(--rowline)", cursor: "pointer" }}>
@@ -1650,6 +1658,15 @@ export default function ProjectDetailPage() {
                       <span style={{ ...MONO, fontSize: 12 }}>{topicDetail.data.summary.posts} posts</span>
                       <span style={{ ...MONO, fontSize: 12, color: "var(--amber)" }}>{Number(topicDetail.data.summary.engagement).toLocaleString()} eng</span>
                       <span style={{ ...MONO, fontSize: 12 }}>{topicDetail.data.summary.pages} pages</span>
+                      {(() => {
+                        const days = (topicDetail.data.posts || []).map((p: any) => p.day).filter(Boolean).sort();
+                        if (!days.length) return null;
+                        const span = days[0] === days[days.length - 1]
+                          ? days[0].slice(5)
+                          : `${days[0].slice(5)} → ${days[days.length - 1].slice(5)}`;
+                        const age = ageLabel(days[days.length - 1]);
+                        return <span style={{ ...MONO, fontSize: 12, color: "var(--muted)" }}>{span}{age ? ` · latest ${age}` : ""}</span>;
+                      })()}
                       {topicDetail.data.summary.mood && <Mood m={topicDetail.data.summary.mood} />}
                     </div>
                     {topicDetail.data.summary.top_pages?.length > 0 && (
@@ -1664,7 +1681,7 @@ export default function ProjectDetailPage() {
                         <div key={i} style={{ padding: "10px 0", borderBottom: "1px solid var(--rowline)" }}>
                           <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 5 }}>
                             <span style={{ fontSize: 13 }}>{p.page}</span>
-                            <span style={{ ...MONO, fontSize: 10, color: "var(--muted)" }}>{p.day.slice(5)}</span>
+                            <span style={{ ...MONO, fontSize: 10, color: "var(--muted)" }}>{p.day.slice(5)}{ageLabel(p.day) ? ` \u00b7 ${ageLabel(p.day)}` : ""}</span>
                             <span style={{ ...MONO, fontSize: 11, color: "var(--amber)" }}>{p.engagement.toLocaleString()} eng</span>
                             {p.url && <span style={{ ...MONO, fontSize: 10, marginLeft: "auto" }}><Ext href={p.url}>open ↗</Ext></span>}
                           </div>
