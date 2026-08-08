@@ -947,6 +947,11 @@ export default function ProjectDetailPage() {
                   </div>
                   <div className="panel-body" style={{ padding: 8 }}>
                     {allTopics.length > 0 ? <WordBubbles topics={allTopics} onPick={openTopic} /> : <div className="muted" style={{ fontSize: 12 }}>{topicWin === "day" ? "No posts in the last 24 hours yet \u2014 the map fills after the next collection run. Try WEEK or MONTH meanwhile." : "No topics in this window \u2014 run \u201cRebuild semantic index\u201d if the corpus has posts."}</div>}
+                    {(velo as any)?.window_stats?.uncaptioned_posts > 0 && (
+                      <div className="muted" style={{ padding: "8px 2px 0", fontSize: 11, fontFamily: "var(--font-mono)" }}>
+                        +{(velo as any).window_stats.uncaptioned_posts} uncaptioned posts in this window (not shown as topics)
+                      </div>
+                    )}
                   </div>
                   <div style={{ display: "flex", gap: 18, padding: "10px 16px", borderTop: "1px solid var(--carbon)", fontFamily: "var(--font-mono)", fontSize: 10, letterSpacing: 1, color: "var(--muted)" }}>
                     <span><span style={{ display: "inline-block", width: 9, height: 9, background: "#427A5B", marginRight: 6 }} />POSITIVE</span>
@@ -1659,7 +1664,9 @@ export default function ProjectDetailPage() {
                       <span style={{ ...MONO, fontSize: 12, color: "var(--amber)" }}>{Number(topicDetail.data.summary.engagement).toLocaleString()} eng</span>
                       <span style={{ ...MONO, fontSize: 12 }}>{topicDetail.data.summary.pages} pages</span>
                       {(() => {
-                        const days = (topicDetail.data.posts || []).map((p: any) => p.day).filter(Boolean).sort();
+                        const s = topicDetail.data.summary || {};
+                        let days = (topicDetail.data.posts || []).map((p: any) => p.day).filter(Boolean).sort();
+                        if (s.first_day && s.last_day) days = [s.first_day, s.last_day];
                         if (!days.length) return null;
                         const span = days[0] === days[days.length - 1]
                           ? days[0].slice(5)
