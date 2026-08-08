@@ -262,6 +262,7 @@ export default function ProjectDetailPage() {
   const [duelA, setDuelA] = useState<string>("");
   const [duelB, setDuelB] = useState<string>("");
   const [urls, setUrls] = useState("https://stluciatimes.com/feed/\n");
+  const [banned, setBanned] = useState<any[]>([]);   // v0.5.33 banned_matches awaiting ADD ANYWAY / LEAVE
   const [dedup, setDedup] = useState<any>(null);        // null = strip closed
   const [dedupBusy, setDedupBusy] = useState(false);
   const [stitchBusy, setStitchBusy] = useState(false);
@@ -614,25 +615,37 @@ export default function ProjectDetailPage() {
     finally { setScouting(false); }
   }
 
-  async function collect() {
-    if (!idValid) return;
-    if (!window.confirm("This runs a fresh paid Apify scrape. The daily scheduler already collects once a day automatically — only collect manually if you need up-to-the-minute data. Continue?")) return;
-    setBusy(true); setError(null); setMsg(null);
-    try {
-      let r = await call(`/projects/${id}/sources`, "POST", { urls: urls.split("\n") });
-      if (r?.banned_matches?.length) {
-        const list = r.banned_matches.map((b: any) =>
-          `\u2022 ${b.url}${b.banned_at ? ` (eliminated ${String(b.banned_at).slice(0, 10)})` : ""}${b.reason ? ` — ${b.reason}` : ""}`).join("\n");
-        if (window.confirm(`These sources were previously ELIMINATED and are permanently banned:\n\n${list}\n\nAdd anyway? This lifts their ban and they become normal sources again.`)) {
-          r = await call(`/projects/${id}/sources`, "POST", { urls: urls.split("\n"), override_banned: true });
-        }
-      }
+  function summarizeCollect(r: any) {
       const note = r?.facebook?.error ? ` (Facebook: ${r.facebook.error})` : "";
       const merged = r?.sources?.merged_variants ? `, ${r.sources.merged_variants} variants merged` : "";
       const lifted = r?.sources?.bans_lifted ? `, ${r.sources.bans_lifted} bans lifted` : "";
       const skipped = r?.sources?.blocked_skipped ? `, ${r.sources.blocked_skipped} eliminated skipped` : "";
       const src = r?.sources ? ` Sources: ${r.sources.found_in_paste} found, ${r.sources.newly_added} new${r.sources.categorized ? `, ${r.sources.categorized} auto-categorized` : ""}${merged}${lifted}${skipped}.` : "";
       setMsg(`Collected ${r?.news?.new_items ?? 0} news, ${r?.facebook?.new_items ?? 0} FB posts${note}.${src}`);
+  }
+
+  async function addAnyway() {
+    if (!idValid) return;
+    setBusy(true); setError(null); setMsg(null);
+    try {
+      const r = await call(`/projects/${id}/sources`, "POST", { urls: urls.split("\n"), override_banned: true });
+      setBanned([]);
+      summarizeCollect(r);
+      await analyze();
+    } catch (e: any) { setError(e.message || "Ban lift failed."); }
+    finally { setBusy(false); }
+  }
+
+  async function collect() {
+    if (!idValid) return;
+    if (!window.confirm("This runs a fresh paid Apify scrape. The daily scheduler already collects once a day automatically — only collect manually if you need up-to-the-minute data. Continue?")) return;
+    setBusy(true); setError(null); setMsg(null); setBanned([]);
+    try {
+      let r = await call(`/projects/${id}/sources`, "POST", { urls: urls.split("\n") });
+      if (r?.banned_matches?.length) {
+        setBanned(r.banned_matches);   // v0.5.33: inline panel replaces the confirm that never surfaced
+      }
+      summarizeCollect(r);
       await analyze();
     } catch (e: any) { setError(e.message || "Collection failed."); }
     finally { setBusy(false); }
@@ -1526,6 +1539,23 @@ export default function ProjectDetailPage() {
                       <div className="muted" style={{ fontSize: 11 }}>Paste anything — the app extracts and cleans the links. Organize with headers (MEDIA: / POLITICIANS: / GROUPS: / GOVERNMENT:) and each link below a header is auto-categorized.</div>
                       <textarea className="input" style={{ minHeight: 180, resize: "none", flex: 1 }} value={urls} onChange={(e) => setUrls(e.target.value)} />
                       {isAdmin && (<button className="btn btn-primary" style={{ width: "100%" }} disabled={busy} onClick={collect}>{busy ? "COLLECTING…" : "Add sources & collect"}</button>)}
+                      {isAdmin && banned.length > 0 && (
+                        <div style={{ border: "1px solid var(--accent-border)", background: "var(--accent-bg)", padding: 10 }}>{/* v0.5.33 ban-recovery panel */}
+                          <div style={{ fontSize: 9, fontWeight: 600, textTransform: "uppercase", letterSpacing: 0.5, color: "var(--amber, #C2A34F)", marginBottom: 6 }}>Previously eliminated — permanently banned</div>
+                          {banned.map((b: any, i: number) => (
+                            <div key={i} style={{ fontFamily: "var(--font-mono)", fontSize: 9, color: "var(--text-2)", padding: "2px 0", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={b.url}>
+                              {String(b.url || "").replace("https://www.facebook.com/", "fb/").replace("https://", "")}
+                              {b.banned_at ? <span className="muted"> · eliminated {String(b.banned_at).slice(0, 10)}</span> : null}
+                              {b.reason ? <span className="muted"> · {b.reason}</span> : null}
+                            </div>
+                          ))}
+                          <div className="muted" style={{ fontSize: 10, margin: "6px 0 8px" }}>These sources were eliminated, so the collectors skip them. Adding anyway lifts the ban and they become normal sources again.</div>
+                          <div style={{ display: "flex", gap: 8 }}>
+                            <button className="btn btn-primary" style={{ fontSize: 9, padding: "4px 10px" }} disabled={busy} onClick={addAnyway}>{busy ? "LIFTING\u2026" : "ADD ANYWAY \u2014 LIFTS BAN"}</button>
+                            <button className="btn" style={{ fontSize: 9, padding: "4px 10px" }} disabled={busy} onClick={() => setBanned([])}>LEAVE ELIMINATED</button>
+                          </div>
+                        </div>
+                      )}
   {isAdmin && (
                       <button className="btn btn-quiet" style={{ width: "100%", marginTop: 6 }} disabled={busy} onClick={async () => {
                         setBusy(true); setError(null); setMsg(null);
