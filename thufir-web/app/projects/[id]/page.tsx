@@ -263,6 +263,7 @@ export default function ProjectDetailPage() {
   const [duelB, setDuelB] = useState<string>("");
   const [urls, setUrls] = useState("https://stluciatimes.com/feed/\n");
   const [banned, setBanned] = useState<any[]>([]);   // v0.5.33 banned_matches awaiting ADD ANYWAY / LEAVE
+  const [pastePosts, setPastePosts] = useState("");   // v0.5.37 manual-ingest door (walled pages)
   const [dedup, setDedup] = useState<any>(null);        // null = strip closed
   const [dedupBusy, setDedupBusy] = useState(false);
   const [stitchBusy, setStitchBusy] = useState(false);
@@ -648,6 +649,43 @@ export default function ProjectDetailPage() {
       summarizeCollect(r);
       await analyze();
     } catch (e: any) { setError(e.message || "Collection failed."); }
+    finally { setBusy(false); }
+  }
+
+  async function ingestPasted() {   /* v0.5.37 manual-ingest door: walled pages -> same pipeline */
+    if (!idValid || !pastePosts.trim()) return;
+    setBusy(true); setError(null); setMsg(null);
+    try {
+      let raw: any;
+      try { raw = JSON.parse(pastePosts); } catch { throw new Error("Not valid JSON — paste the scraped post list exactly as produced (a JSON array of posts)."); }
+      const arr: any[] = Array.isArray(raw) ? raw : Array.isArray(raw?.posts) ? raw.posts : [];
+      if (!arr.length) throw new Error("No posts found in the pasted JSON.");
+      const norm = arr.map((p: any) => ({
+        page_url: String(p.page_url ?? p.pageUrl ?? p.page ?? p.profile ?? p.facebookUrl ?? "").trim(),
+        text: String(p.text ?? p.content ?? p.message ?? ""),
+        time: p.time ?? p.date ?? p.timestamp ?? p.posted_at ?? null,
+        url: p.url ?? p.permalink ?? p.postUrl ?? p.link ?? undefined,
+        reactions: p.reactions ?? p.likes ?? undefined,
+        comments: p.comments ?? p.commentsCount ?? undefined,
+        shares: p.shares ?? p.sharesCount ?? undefined,
+        views: p.views ?? p.viewsCount ?? undefined,
+      })).filter((p: any) => p.page_url);
+      if (!norm.length) throw new Error("None of the pasted posts carry a page_url — each post needs the page it came from.");
+      const tot = { ingested: 0, new_clusters: 0, received: 0, skipped_undated: 0, skipped_unknown_page: 0 };
+      for (let i = 0; i < norm.length; i += 40) {           // chunk: keep each request far below the edge timeout
+        const r = await call(`/projects/${id}/ingest-posts`, "POST", { posts: norm.slice(i, i + 40) });
+        tot.ingested += r.ingested || 0; tot.new_clusters += r.new_clusters || 0; tot.received += r.received || 0;
+        tot.skipped_undated += r.skipped_undated || 0; tot.skipped_unknown_page += r.skipped_unknown_page || 0;
+      }
+      const parts = [`${tot.ingested} post${tot.ingested === 1 ? "" : "s"} ingested`];
+      if (tot.new_clusters) parts.push(`${tot.new_clusters} new topic${tot.new_clusters === 1 ? "" : "s"}`);
+      if (tot.skipped_undated) parts.push(`${tot.skipped_undated} skipped (no date)`);
+      if (tot.skipped_unknown_page) parts.push(`${tot.skipped_unknown_page} skipped (page not in roster — add it under Sources first)`);
+      const dup = tot.received - tot.ingested - tot.skipped_undated - tot.skipped_unknown_page;
+      if (dup > 0) parts.push(`${dup} already known`);
+      setMsg(`Manual ingest: ${parts.join(" · ")}.`);
+      if (tot.ingested > 0) { setPastePosts(""); await analyze(); }
+    } catch (e: any) { setError(e.message || "Manual ingest failed."); }
     finally { setBusy(false); }
   }
 
@@ -1554,6 +1592,16 @@ export default function ProjectDetailPage() {
                             <button className="btn btn-primary" style={{ fontSize: 9, padding: "4px 10px" }} disabled={busy} onClick={addAnyway}>{busy ? "LIFTING\u2026" : "ADD ANYWAY \u2014 LIFTS BAN"}</button>
                             <button className="btn" style={{ fontSize: 9, padding: "4px 10px" }} disabled={busy} onClick={() => setBanned([])}>LEAVE ELIMINATED</button>
                           </div>
+                        </div>
+                      )}
+                      {isAdmin && (
+                        <div style={{ marginTop: 10 }}>{/* v0.5.37 manual-ingest door */}
+                          <div style={{ fontSize: 9, fontWeight: 600, textTransform: "uppercase", letterSpacing: 0.5, color: "var(--text-2)", marginBottom: 4 }}>Manual post ingest — walled pages</div>
+                          <div className="muted" style={{ fontSize: 10, marginBottom: 6 }}>For pages the collector can never reach (friends-only profiles). Paste the scraped post JSON — each post needs its page URL, text, and date. Posts flow through the exact same pipeline as collected data: dedup, topics, map, editions. Undated posts are dropped; unknown pages must be added under Sources first.</div>
+                          <textarea className="input" style={{ minHeight: 110, resize: "none", width: "100%", fontFamily: "var(--font-mono)", fontSize: 10 }}
+                            placeholder='[{"page_url":"facebook.com/…","text":"…","time":"2026-08-10T14:00:00Z","url":"…","reactions":0}]'
+                            value={pastePosts} onChange={(e) => setPastePosts(e.target.value)} />
+                          <button className="btn btn-primary" style={{ width: "100%", marginTop: 6 }} disabled={busy || !pastePosts.trim()} onClick={ingestPasted}>{busy ? "INGESTING…" : "Ingest pasted posts"}</button>
                         </div>
                       )}
   {isAdmin && (
