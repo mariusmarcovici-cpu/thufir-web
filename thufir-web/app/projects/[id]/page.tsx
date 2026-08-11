@@ -1197,7 +1197,7 @@ export default function ProjectDetailPage() {
                     <span className="ph-right">
                       <span className="seg seg-sm">
                         {(["day", "week", "month"] as const).map((w) => (
-                          <button key={w} data-on={tpWin === w} onClick={() => setTpWin(w)}>{w === "day" ? "LAST 24H" : w === "week" ? "LAST 7D" : "LAST 30D"}</button>
+                          <button key={w} data-on={tpWin === w} onClick={() => setTpWin(w)}>{w === "day" ? anchorChip : w === "week" ? "LAST 7D" : "LAST 30D"}</button>
                         ))}
                       </span>
                     </span>
