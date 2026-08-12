@@ -297,6 +297,13 @@ export default function ProjectDetailPage() {
   const topicWinRef = useRef(topicWin);
   const catRef = useRef(cat);
   const [kindDraft, setKindDraft] = useState<Record<string, string>>({});
+  const [labelDraft, setLabelDraft] = useState<Record<string, string>>({}); // v0.5.45 display names
+  // v0.5.45: a source's face = scraped title, else a human label, else the URL.
+  const srcName = (a: any) => {
+    const lbl = String(a.label || "");
+    const named = a.page_title || (lbl && !/facebook\.com|^https?:\/\/|^www\./i.test(lbl) && lbl !== a.public_ref ? lbl : "");
+    return named || String(a.public_ref || lbl || "").replace("https://www.facebook.com/", "fb/").replace("https://", "");
+  };
 
   const analyze = useCallback(async (elena = false, category = "", force = false) => {
     if (!idValid) return;
@@ -503,6 +510,11 @@ export default function ProjectDetailPage() {
     if (!idValid) return;
     try {
       await call(`/projects/${id}/anchor-kinds`, "PUT", { kinds: kindDraft });
+      const lbls = Object.fromEntries(Object.entries(labelDraft).filter(([, v]) => String(v || "").trim()));
+      if (Object.keys(lbls).length) {
+        await call(`/projects/${id}/anchor-labels`, "PUT", { labels: lbls });
+        setLabelDraft({});
+      }
       if (Object.keys(factionDraft).length) {
         try {
           await call(`/projects/${id}/anchor-factions`, "PUT", { factions: factionDraft });
@@ -1548,9 +1560,15 @@ export default function ProjectDetailPage() {
                           <div className="stat-label" style={{ marginBottom: 8 }}>Assign each source a category</div>
                           {(project?.anchors || []).map((a: any) => (
                             <div key={a.id} style={{ display: "flex", alignItems: "center", gap: 8, padding: "4px 0", borderBottom: "1px solid var(--rowline)" }}>
-                              <span style={{ fontFamily: "var(--font-mono)", fontSize: 10, color: "var(--text-2)", flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                                {(a.public_ref || a.label || "").replace("https://www.facebook.com/", "fb/").replace("https://", "")}
+                              <span title={a.public_ref || ""} style={{ fontFamily: "var(--font-mono)", fontSize: 10, color: "var(--text-2)", flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                                {srcName(a)}
                               </span>
+                              {isAdmin && (
+                                <input className="select" style={{ width: 130, fontSize: 10, padding: "3px 6px", flexShrink: 0 }}
+                                  placeholder="name…" title="Display name for this source — saved with Save categories. Useful for numeric pages the scraper can't read."
+                                  value={labelDraft[a.id] ?? ""}
+                                  onChange={(e) => setLabelDraft((cur) => ({ ...cur, [a.id]: e.target.value }))} />
+                              )}
                               {(a.page_category || a.service_area) && (
                                 <span className="muted" style={{ ...MONO, fontSize: 9, flexShrink: 0, maxWidth: 150, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={`${a.page_category || ""}${a.service_area ? " · " + a.service_area : ""}`}>
                                   {a.page_category || "?"}{a.service_area ? ` · ${a.service_area}` : ""}
